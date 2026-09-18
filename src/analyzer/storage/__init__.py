@@ -14,6 +14,7 @@ from __future__ import annotations
 import duckdb
 
 from analyzer.storage.corporate_actions import ACTION_COLUMNS, CorporateActionStore
+from analyzer.storage.indicators import BASE_COLUMNS, IndicatorStore
 from analyzer.storage.prices import (
     LOADED_COLUMNS,
     OPTIONAL_PRICE_COLUMNS,
@@ -37,11 +38,13 @@ def connect(cfg: AppConfig) -> duckdb.DuckDBPyConnection:
 
 __all__ = [
     "ACTION_COLUMNS",
+    "BASE_COLUMNS",
     "LOADED_COLUMNS",
     "OPTIONAL_PRICE_COLUMNS",
     "PRICE_COLUMNS",
     "UNKNOWN_MIC",
     "CorporateActionStore",
+    "IndicatorStore",
     "PriceStore",
     "Table",
     "check_identifier",

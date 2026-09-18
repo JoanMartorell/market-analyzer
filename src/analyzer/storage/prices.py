@@ -76,20 +76,6 @@ class PriceStore(Table):
 
     # --- lectura -----------------------------------------------------------
 
-    def last_dates(self, keys: pd.DataFrame | None = None) -> pd.DataFrame:
-        """Última fecha guardada por clave: columnas ticker, mic, last_date (``date``).
-
-        Con ``keys`` (ticker, mic) se limita a esas claves.
-        """
-        with self._key_filter(keys) as key_clause:
-            where = f" WHERE {key_clause}" if key_clause else ""
-            frame = self._con.execute(
-                f"SELECT ticker, mic, max(date) AS last_date FROM {self.table}{where} "  # noqa: S608
-                "GROUP BY ticker, mic ORDER BY ticker, mic"
-            ).df()
-        frame["last_date"] = pd.to_datetime(frame["last_date"]).dt.date
-        return frame
-
     def load(
         self,
         start: Any | None = None,
