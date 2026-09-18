@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from analyzer.sessions import last_closed_session
+from analyzer.sessions import last_closed_session, next_session
 from core.config import AppConfig
 
 MADRID = ZoneInfo("Europe/Madrid")
@@ -45,3 +45,21 @@ def test_europe_waits_for_every_market_to_close(cfg: AppConfig) -> None:
 def test_naive_datetime_is_rejected(cfg: AppConfig) -> None:
     with pytest.raises(ValueError, match="zona horaria"):
         last_closed_session(cfg.regions["americas"], datetime(2026, 9, 17, 18))
+
+
+# --- siguiente sesión ---------------------------------------------------------------
+
+
+def test_next_session_is_the_following_trading_day(cfg: AppConfig) -> None:
+    americas = cfg.regions["americas"]
+
+    assert next_session(americas, date(2026, 9, 17), "XNYS") == date(2026, 9, 18)
+    assert next_session(americas, date(2026, 9, 18), "XNYS") == date(2026, 9, 21)  # fin de semana
+    assert next_session(americas, date(2026, 12, 24), "XNAS") == date(2026, 12, 28)  # Navidad
+
+
+def test_next_session_without_a_known_market_takes_the_earliest(cfg: AppConfig) -> None:
+    americas = cfg.regions["americas"]
+
+    assert next_session(americas, date(2026, 9, 18)) == date(2026, 9, 21)
+    assert next_session(americas, date(2026, 9, 18), "UNKNOWN") == date(2026, 9, 21)

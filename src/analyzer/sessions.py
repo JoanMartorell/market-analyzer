@@ -45,3 +45,21 @@ def last_closed_session(region: Region, now: datetime) -> date | None:
         ):
             return day
     return None
+
+
+def next_session(region: Region, after: date, mic: str | None = None) -> date | None:
+    """Primera sesión posterior a ``after`` en el mercado ``mic`` de la región.
+
+    Es cuando se ejecuta una señal del día ``after`` (``execute_at: next_open``).
+    Sin ``mic``, o con uno que no es de la región (universo sin MIC), vale la
+    primera sesión de cualquiera de sus mercados. ``None`` solo con un
+    calendario roto: no hay bolsa que cierre quince días seguidos.
+    """
+    markets = [m for m in region.markets if m.mic == mic] or list(region.markets)
+    start, end = after + timedelta(days=1), after + _WINDOW
+    found: list[date] = []
+    for market in markets:
+        calendar = xcals.get_calendar(market.calendar, start=str(start), end=str(end))
+        if len(calendar.sessions):
+            found.append(calendar.sessions[0].date())
+    return min(found, default=None)

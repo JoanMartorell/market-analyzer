@@ -30,6 +30,7 @@ from analyzer.storage.prices import (
     UNKNOWN_MIC,
     PriceStore,
 )
+from analyzer.storage.signals import SIGNAL_COLUMNS, SignalStore
 from analyzer.storage.snapshots import UNIVERSE_COLUMNS, SnapshotRunStore, SnapshotStore
 from analyzer.storage.sql import check_identifier
 from analyzer.storage.table import Table
@@ -56,6 +57,7 @@ __all__ = [
     "NEWS_COLUMNS",
     "OPTIONAL_PRICE_COLUMNS",
     "PRICE_COLUMNS",
+    "SIGNAL_COLUMNS",
     "UNIVERSE_COLUMNS",
     "UNKNOWN_MIC",
     "CorporateActionStore",
@@ -65,6 +67,7 @@ __all__ = [
     "NewsClusterStore",
     "NewsStore",
     "PriceStore",
+    "SignalStore",
     "SnapshotRunStore",
     "SnapshotStore",
     "Table",

@@ -28,7 +28,7 @@ from analyzer.steps.llm.schema import Analysis, json_schema
 from analyzer.steps.llm.service import check_answer, parse_answer
 from analyzer.steps.screener import CANDIDATE_COLUMNS
 from analyzer.storage import CALL_COLUMNS, CLUSTER_COLUMNS, LlmCallStore, connect
-from core.config import AppConfig, Env, LLMSettings
+from core.config import AppConfig, Env, LlmPricing, LLMSettings
 
 AS_OF = date(2026, 9, 17)
 NOW = datetime(2026, 9, 17, 20, 0, tzinfo=UTC)
@@ -395,8 +395,15 @@ def test_a_forgotten_candidate_fails() -> None:
 # --- coste ------------------------------------------------------------------------------
 
 
-def test_cost_adds_every_kind_of_token(settings: LLMSettings) -> None:
-    pricing = settings.pricing.model_copy(update={"input_per_mtok": 3.0, "output_per_mtok": 15.0})
+def test_cost_adds_every_kind_of_token() -> None:
+    # Tarifa fija: el test no depende de los multiplicadores que haya en settings.yaml.
+    pricing = LlmPricing(
+        input_per_mtok=3.0,
+        output_per_mtok=15.0,
+        cache_write_multiplier=1.25,
+        cache_read_multiplier=0.1,
+        batch_multiplier=0.5,
+    )
     usage = TokenUsage(
         input_tokens=1_000_000,
         output_tokens=1_000_000,
