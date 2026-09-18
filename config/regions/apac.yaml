@@ -3,7 +3,7 @@
 # de comida en Tokio. exchange_calendars lo cubre; nunca usar weekday() < 5.
 id: apac
 name: Asia-Pacífico
-enabled: true                      # PROVISIONAL para probar serve; producción: false
+enabled: false
 
 markets:
   - { mic: XTKS, calendar: XTKS, currency: JPY }   # Tokio
@@ -12,7 +12,7 @@ markets:
   - { mic: XKRX, calendar: XKRX, currency: KRW }   # Corea
 
 schedule:
-  run_at: "20:45"                  # PROVISIONAL para probar serve; producción: "10:30"
+  run_at: "10:30"                  # tras el cierre asiático (Tokio cierra a las 08:00 hora local)
                                    # (cierres entre 07:00 y 09:00 hora peninsular)
   execute_at: next_open
   reevaluation_gate: null

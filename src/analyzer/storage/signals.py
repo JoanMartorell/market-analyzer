@@ -42,6 +42,7 @@ SIGNAL_COLUMNS = (
     "execute_on",
     "verdict",
     "confidence",
+    "headline",
     "rationale",
     "risks",
     "llm_model",
@@ -80,6 +81,7 @@ class SignalStore(Table):
     )
     """
     COLUMNS_ADDED: ClassVar[dict[str, str]] = {
+        "headline": "VARCHAR",  # el motivo del modelo en una línea, para el aviso
         "execution_open": "DOUBLE",  # apertura real de la sesión execute_on
         "open_gap": "DOUBLE",  # execution_open / close - 1
         "reconcile_status": "VARCHAR",  # conciliada | desviada | sin_precio

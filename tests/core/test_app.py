@@ -4,11 +4,12 @@ from dataclasses import replace
 from datetime import date
 from typing import Any
 
+import pandas as pd
 import pytest
 
 from analyzer.engine import StepContext, StepError, StepOutcome, StepStatus
 from core import app
-from core.config import AppConfig, Env
+from core.config import AppConfig, ConfigError, Env
 from delivery import Dispatcher, Message
 
 DAY = date(2026, 9, 18)
@@ -122,3 +123,49 @@ def test_reconcile_region_runs_only_step_twelve(
 
     assert [r.name for r in result.reports] == ["reconcile"]
     assert daily.seen == []
+
+
+class SignalStep(FakeStep):
+    """Deja en el contexto lo que persist dejaría, para que el mensaje sea el resumen."""
+
+    def run(self, ctx: StepContext) -> StepOutcome:
+        ctx.data["signals"] = pd.DataFrame(
+            [
+                {
+                    "ticker": "AAA",
+                    "mic": "XNYS",
+                    "direction": "long",
+                    "score": 0.8,
+                    "conditions_met": "rsi_14 < 35",
+                    "close": 10.0,
+                    "currency": "USD",
+                    "execute_on": DAY,
+                    "verdict": None,
+                    "confidence": None,
+                    "rationale": None,
+                }
+            ]
+        )
+        ctx.data["analysis"] = None
+        return super().run(ctx)
+
+
+def test_a_good_cycle_delivers_the_digest_not_the_step_table(
+    cfg_tmp: AppConfig, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    daily = SignalStep("persist", "1 señal")
+    reconcile = FakeStep("reconcile", "sin señales pendientes de conciliar a 2026-09-18")
+    outbox, dispatcher = _wire(monkeypatch, daily, reconcile)
+
+    app.run_region(cfg_tmp, "americas", DAY, dispatcher=dispatcher)
+
+    message = outbox.messages[0]
+    assert message.subject == "[americas] 2026-09-18: 1 candidato sin veredicto"
+    assert "• AAA · 10.00 USD · score 0.80 · rsi_14 < 35" in message.body
+    assert "Ayer: sin señales pendientes de conciliar a 2026-09-18" in message.body
+    assert "persist" not in message.body  # la tabla de pasos se queda en el log
+
+
+def test_telegram_chats_needs_the_token(cfg_tmp: AppConfig) -> None:
+    with pytest.raises(ConfigError, match="TELEGRAM_BOT_TOKEN"):
+        app.telegram_chats(cfg_tmp)

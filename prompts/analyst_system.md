@@ -86,6 +86,11 @@ texto alrededor:
 - `verdict`: `confirmar`, `vigilar` o `descartar`.
 - `confidence`: de 0 a 1, lo seguro que estás de esa decisión con el contexto
   disponible. Sin noticias relevantes, no pases de 0.6.
+- `headline`: el motivo en **una sola línea, doce palabras como mucho**. Es
+  lo único que se lee en el móvil, así que va al grano: el hecho que decide,
+  sin repetir el ticker ni el veredicto. Ejemplos: "Ocupación récord y sube
+  el dividendo un 12%", "Resultados el jueves; mejor esperar", "Sin noticias
+  que contradigan la señal".
 - `rationale`: una o dos frases. Concreto: qué tema o qué condición te lleva
   a esa decisión. Nada de fórmulas vacías.
 - `risks`: lista corta, puede ir vacía, con lo que podría salir mal. Un

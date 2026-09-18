@@ -51,6 +51,7 @@ def _verdict(ticker: str, name: str = "confirmar", confidence: float = 0.7) -> V
         ticker=ticker,
         verdict=name,
         confidence=confidence,
+        headline="Buena pinta",
         rationale=f"{ticker} tiene buena pinta.",
         risks=["riesgo uno", "riesgo dos; con punto y coma"],
     )
@@ -112,6 +113,7 @@ def test_a_signal_carries_the_rule_the_panel_and_the_verdict() -> None:
     assert row["currency"] == "USD"
     assert row["verdict"] == "confirmar"
     assert row["confidence"] == 0.7
+    assert row["headline"] == "Buena pinta"
     assert row["risks"] == ["riesgo uno", "riesgo dos; con punto y coma"]
     assert row["llm_model"] == "claude-sonnet-5"
 

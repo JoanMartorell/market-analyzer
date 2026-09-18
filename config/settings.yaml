@@ -54,23 +54,23 @@ llm:
   effort: high                     # medir esto antes de montar una cascada de modelos
   max_tokens: 8192
   use_batch_api: true              # análisis nocturno: 50% de descuento
-  batch_wait_minutes: 10           # si el lote tarda más, se repite la llamada en directo
+  batch_wait_minutes: 3            # si el lote tarda más, se repite la llamada en directo
   prompt_caching: true
   max_calls_per_cycle: 1
-  monthly_budget_eur: 25           # aviso si la estimación acumulada lo supera
+  monthly_budget_eur: 5            # aviso si la estimación acumulada lo supera
   prompt_file: prompts/analyst_system.md
   pricing:                         # EUR por millón de tokens; la API solo devuelve tokens
     input_per_mtok: 2.00           # revisar en platform.claude.com/pricing al cambiar de modelo
     output_per_mtok: 10.00
     cache_write_multiplier: 2.50
     cache_read_multiplier: 0.20
-    batch_multiplier: 1
+    batch_multiplier: 0.5
 
 reconcile:                         # paso 12: apertura real de la ejecución vs cierre asumido
   max_open_gap: 0.02               # gap absoluto por encima del cual la señal queda "desviada"
 
 delivery:
-  channels: [console]              # PROVISIONAL para pruebas; producción: [telegram]
+  channels: [console, telegram]              # PROVISIONAL para pruebas; producción: [telegram]
   notify_on_failure: true          # el silencio no es éxito
   notify_on_no_signals: true
 

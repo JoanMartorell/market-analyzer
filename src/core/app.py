@@ -7,6 +7,7 @@ donde ``analyzer`` y ``delivery`` se conocen; ninguno de los dos importa al otro
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -22,8 +23,10 @@ from analyzer.steps.ingest.service import universe_keys
 from analyzer.storage import PriceStore, connect
 from analyzer.universe import load_constituents, members_as_of, members_between
 from core.config import AppConfig, ConfigError, Region, load_config
+from core.digest import build_digest
 from core.logs import configure_logging
-from delivery import Dispatcher, Message, build_dispatcher, required_env
+from delivery import Dispatcher, Message, TelegramChat, build_dispatcher, required_env
+from delivery import telegram_chats as discover_telegram_chats
 
 log = structlog.get_logger(__name__)
 
@@ -92,7 +95,7 @@ def run_region(
         result.reports.extend(reconcile_region(cfg, region_id, as_of).reports)
     log.info("pipeline.end", region=region_id, ok=result.ok, stopped=result.stopped_early)
 
-    notify(cfg, result, dispatcher)
+    notify(cfg, result, dispatcher, data=ctx.data)
     return result
 
 
@@ -117,7 +120,17 @@ def _region(cfg: AppConfig, region_id: str) -> Region:
     return region
 
 
-def notify(cfg: AppConfig, result: PipelineResult, dispatcher: Dispatcher) -> None:
+def notify(
+    cfg: AppConfig,
+    result: PipelineResult,
+    dispatcher: Dispatcher,
+    data: Mapping[str, Any] | None = None,
+) -> None:
+    """Entrega el ciclo: el resumen de señales si fue bien, la tabla de pasos si no.
+
+    ``data`` es el contexto que dejaron los pasos (señales, análisis, coste);
+    sin él solo se puede enviar la tabla de pasos.
+    """
     delivery = cfg.settings.delivery
     if not result.ok:
         if delivery.notify_on_failure:
@@ -129,11 +142,21 @@ def notify(cfg: AppConfig, result: PipelineResult, dispatcher: Dispatcher) -> No
                 )
             )
         return
-    if result.stopped_early and not delivery.notify_on_no_signals:
+    if result.stopped_early:
+        if delivery.notify_on_no_signals:
+            dispatcher.send(
+                Message(subject=f"[{result.region_id}] ciclo {result.as_of}", body=result.summary())
+            )
         return
-    dispatcher.send(
-        Message(subject=f"[{result.region_id}] ciclo {result.as_of}", body=result.summary())
-    )
+    dispatcher.send(build_digest(result, data if data is not None else {}))
+
+
+def telegram_chats(cfg: AppConfig) -> list[TelegramChat]:
+    """Chats que han escrito al bot de Telegram: de ahí sale ``TELEGRAM_CHAT_ID``."""
+    token = cfg.env.get("TELEGRAM_BOT_TOKEN")
+    if token is None:
+        raise ConfigError("falta TELEGRAM_BOT_TOKEN en .env")
+    return discover_telegram_chats(token)
 
 
 # ---------------------------------------------------------------------------

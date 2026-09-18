@@ -23,7 +23,7 @@ from delivery.base import (
 )
 from delivery.console import ConsoleProvider
 from delivery.dispatcher import DeliveryReport, Dispatcher
-from delivery.telegram import TelegramProvider
+from delivery.telegram import TelegramChat, TelegramProvider, telegram_chats
 
 REGISTRY: dict[str, type[RegisteredProvider]] = {
     ConsoleProvider.name: ConsoleProvider,
@@ -69,8 +69,10 @@ __all__ = [
     "Dispatcher",
     "Message",
     "Severity",
+    "TelegramChat",
     "TelegramProvider",
     "available_providers",
     "build_dispatcher",
     "required_env",
+    "telegram_chats",
 ]

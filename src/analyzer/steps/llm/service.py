@@ -108,8 +108,9 @@ def run_llm(
     )
     digest = payload_hash(payload)
 
-    saved = _reusable(store.get(region_id, as_of), digest, settings.model)
+    saved = _reusable(store.get(region_id, as_of), digest, settings.model, candidates)
     if saved is not None:
+        row, analysis = saved
         log.info("llm.reused", region=region_id, as_of=str(as_of), payload=digest[:12])
         return _report(
             region_id,
@@ -119,9 +120,9 @@ def run_llm(
             usage=TokenUsage(),
             cost=0.0,
             month_cost=store.month_cost(as_of),
-            batch=bool(saved["batch"]),
+            batch=bool(row["batch"]),
             reused=True,
-            analysis=check_answer(parse_answer(str(saved["response"])), candidates),
+            analysis=analysis,
         )
 
     reply = client.ask(prompt, dumps(payload))
@@ -201,11 +202,21 @@ def estimate_cost(usage: TokenUsage, pricing: LlmPricing, *, batch: bool) -> flo
     return round(total, 6)
 
 
-def _reusable(saved: dict[str, Any] | None, digest: str, model: str) -> dict[str, Any] | None:
-    """La llamada guardada sirve si la entrada y el modelo son los mismos."""
+def _reusable(
+    saved: dict[str, Any] | None, digest: str, model: str, candidates: pd.DataFrame
+) -> tuple[dict[str, Any], Analysis] | None:
+    """La llamada guardada sirve si la entrada y el modelo son los mismos y aún se entiende.
+
+    Una respuesta anterior a un cambio del esquema (un campo nuevo, por
+    ejemplo) no encaja: se avisa y se vuelve a llamar en vez de fallar el día.
+    """
     if saved is None or saved["payload_hash"] != digest or saved["model"] != model:
         return None
-    return saved
+    try:
+        return saved, check_answer(parse_answer(str(saved["response"])), candidates)
+    except ValueError as exc:
+        log.warning("llm.saved_answer_unusable", detail=str(exc))
+        return None
 
 
 def _report(

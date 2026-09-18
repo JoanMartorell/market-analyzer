@@ -3,7 +3,7 @@
 # americana entremedias. Por eso lleva gate de reevaluación.
 id: europe
 name: Europa
-enabled: true                      # PROVISIONAL para probar serve; producción: false
+enabled: false
 
 markets:
   - { mic: XETR, calendar: XETR, currency: EUR }   # Xetra
@@ -24,7 +24,7 @@ markets:
   - { mic: XWAR, calendar: XWAR, currency: PLN }   # Varsovia
 
 schedule:
-  run_at: "20:30"                  # PROVISIONAL para probar serve; producción: "19:30"
+  run_at: "19:30"                  # tras el cierre europeo (17:30)
   execute_at: next_open
   reevaluation_gate:
     at: "08:45"                    # antes de la apertura de las 09:00

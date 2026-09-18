@@ -12,7 +12,7 @@ markets:
     currency: USD
 
 schedule:
-  run_at: "20:15"                  # PROVISIONAL para probar serve; producción: "06:30"
+  run_at: "06:30"                  # tras el cierre USA (22:00); la señal se ejecuta en la apertura de las 15:30
                                    # Hora local (settings.local_timezone). Entre comillas:
                                    # sin ellas YAML lo lee como el entero 390.
   execute_at: next_open            # señales del día D se ejecutan en la apertura de D+1

@@ -98,6 +98,7 @@ def _answer(*tickers: str, summary: str = "Día tranquilo.") -> str:
                     "ticker": t,
                     "verdict": "confirmar",
                     "confidence": 0.6,
+                    "headline": "Sin noticias en contra",
                     "rationale": "La señal técnica se sostiene.",
                     "risks": ["Resultados en dos semanas."],
                 }
@@ -472,6 +473,24 @@ def test_repeating_the_cycle_does_not_pay_twice(store: LlmCallStore, settings: L
     assert second.cost_eur == 0.0
     assert second.analysis == first.analysis
     assert "reutilizada" in second.summary()
+
+
+def test_a_saved_answer_from_an_older_schema_is_not_reused(
+    store: LlmCallStore, settings: LLMSettings
+) -> None:
+    client = FakeClient(_answer("AAA"))
+    first = _run(store, settings, client)
+    old = json.loads(_answer("AAA"))
+    del old["verdicts"][0]["headline"]  # respuesta guardada antes de existir el campo
+    saved = store.get("americas", AS_OF)
+    assert saved is not None
+    store.upsert({**saved, "response": json.dumps(old)})
+
+    second = _run(store, settings, client)
+
+    assert len(client.asked) == 2  # se vuelve a llamar en vez de fallar el día
+    assert second.reused is False
+    assert second.analysis == first.analysis
 
 
 def test_a_different_input_replaces_the_call(store: LlmCallStore, settings: LLMSettings) -> None:

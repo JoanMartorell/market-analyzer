@@ -7,7 +7,7 @@ import httpx
 import pytest
 
 from delivery import DeliveryError, Message
-from delivery.telegram import TelegramProvider
+from delivery.telegram import TelegramProvider, telegram_chats
 from delivery.telegram.provider import TELEGRAM_MAX_LEN, split_text
 
 Handler = Callable[[httpx.Request], httpx.Response]
@@ -74,3 +74,52 @@ def test_split_prefers_line_breaks() -> None:
     assert split_text("abc", 10) == ["abc"]
     assert split_text("aaaa\nbbbb\ncccc", 8) == ["aaaa", "bbbb", "cccc"]
     assert split_text("x" * 25, 10) == ["x" * 10, "x" * 10, "x" * 5]
+
+
+# --- descubrir el chat --------------------------------------------------------------
+
+
+def _updates(handler: Handler) -> httpx.Client:
+    def wrapped(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/botTOKEN/getUpdates"
+        return handler(request)
+
+    return httpx.Client(transport=httpx.MockTransport(wrapped))
+
+
+def test_chats_come_from_the_updates_most_recent_first() -> None:
+    updates = [
+        {
+            "update_id": 1,
+            "message": {
+                "chat": {"id": 111, "type": "private", "first_name": "Joan", "username": "jm"},
+                "text": "/start",
+            },
+        },
+        {
+            "update_id": 2,
+            "my_chat_member": {"chat": {"id": -222, "type": "group", "title": "Señales"}},
+        },
+        {"update_id": 3, "message": {"chat": {"id": 111, "type": "private"}, "text": "hola"}},
+    ]
+    client = _updates(lambda _r: httpx.Response(200, json={"ok": True, "result": updates}))
+
+    chats = telegram_chats("TOKEN", client=client)
+
+    assert [(c.id, c.kind, c.title, c.last_text) for c in chats] == [
+        (111, "private", "(sin nombre)", "hola"),
+        (-222, "group", "Señales", ""),
+    ]
+
+
+def test_chats_without_updates_is_empty() -> None:
+    client = _updates(lambda _r: httpx.Response(200, json={"ok": True, "result": []}))
+    assert telegram_chats("TOKEN", client=client) == []
+
+
+def test_chats_with_a_bad_token_is_a_delivery_error() -> None:
+    client = _updates(
+        lambda _r: httpx.Response(401, json={"ok": False, "description": "Unauthorized"})
+    )
+    with pytest.raises(DeliveryError, match="401"):
+        telegram_chats("TOKEN", client=client)

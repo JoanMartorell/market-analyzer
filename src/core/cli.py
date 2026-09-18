@@ -24,6 +24,7 @@ from core.app import (
     prices_status,
     reconcile_region,
     run_region,
+    telegram_chats,
 )
 from core.config import AppConfig, ConfigError, Region
 from core.scheduler import serve as serve_forever
@@ -38,6 +39,8 @@ ingest_app = typer.Typer(
     no_args_is_help=True, help="Precios diarios: carga histórica y estado de staging."
 )
 app.add_typer(ingest_app, name="ingest")
+telegram_app = typer.Typer(no_args_is_help=True, help="Entrega por Telegram: descubrir el chat.")
+app.add_typer(telegram_app, name="telegram")
 
 ConfigDirOption = Annotated[
     Path | None,
@@ -273,6 +276,31 @@ def ingest_status(
     typer.echo(f"rango:       {status['first_date']} -> {status['last_date']}")
     _echo_list("sin ninguna vela", status["absent"])
     _echo_list(f"sin llegar a {day}", status["stale"])
+
+
+@telegram_app.command("chats")
+def telegram_chats_cmd(config_dir: ConfigDirOption = None) -> None:
+    """Muestra los chats que han escrito al bot y el TELEGRAM_CHAT_ID que hay que poner en .env."""
+    try:
+        cfg = bootstrap(config_dir)
+        chats = telegram_chats(cfg)
+    except ConfigError as exc:
+        raise _fail(str(exc), 2) from None
+    except DeliveryError as exc:
+        raise _fail(str(exc), 1) from None
+
+    if not chats:
+        typer.secho("El bot no ha recibido ningún mensaje.", fg=typer.colors.YELLOW)
+        typer.echo("Abre Telegram, busca tu bot, pulsa Start (o escribe cualquier cosa) y")
+        typer.echo("vuelve a lanzar este comando. Telegram solo guarda los mensajes 24 horas.")
+        raise typer.Exit(code=1)
+
+    typer.echo("Chats que han escrito al bot (el más reciente primero):")
+    for chat in chats:
+        last = f'  último: "{chat.last_text}"' if chat.last_text else ""
+        typer.echo(f"  {chat.id:<16} {chat.kind:10} {chat.title}{last}")
+    typer.echo("")
+    typer.secho(f"Pon en .env:  TELEGRAM_CHAT_ID={chats[0].id}", fg=typer.colors.GREEN)
 
 
 def _echo_list(label: str, items: list[str], limit: int = 20) -> None:

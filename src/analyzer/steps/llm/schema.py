@@ -37,6 +37,10 @@ class Verdict(Answer):
     ticker: str
     verdict: Name
     confidence: float = Field(ge=0.0, le=1.0, description="De 0 a 1.")
+    headline: str = Field(
+        description="El motivo en una sola línea, doce palabras como mucho: es lo que se lee "
+        "en el móvil."
+    )
     rationale: str
     risks: list[str]
 

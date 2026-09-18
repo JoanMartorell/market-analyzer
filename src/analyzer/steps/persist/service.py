@@ -131,6 +131,7 @@ def build_signals(
     verdicts = _verdicts(signals["ticker"], analysis)
     signals["verdict"] = [None if v is None else v.verdict for v in verdicts]
     signals["confidence"] = [None if v is None else v.confidence for v in verdicts]
+    signals["headline"] = [None if v is None else v.headline for v in verdicts]
     signals["rationale"] = [None if v is None else v.rationale for v in verdicts]
     signals["risks"] = pd.Series(
         [None if v is None else list(v.risks) for v in verdicts], index=signals.index, dtype=object
