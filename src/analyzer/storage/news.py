@@ -59,7 +59,7 @@ class NewsStore(Table):
         if frame.empty:
             return 0
         incoming = frame.loc[:, list(NEWS_COLUMNS)].copy()
-        incoming["published_at"] = _naive_utc(incoming["published_at"])
+        incoming["published_at"] = naive_utc(incoming["published_at"])
         incoming["reliability"] = incoming["reliability"].astype("float64")
         incoming["as_of"] = as_of
         incoming["fetched_at"] = datetime.now(UTC).replace(tzinfo=None)
@@ -114,6 +114,7 @@ class NewsStore(Table):
         return frame
 
 
-def _naive_utc(series: pd.Series) -> pd.Series:
+def naive_utc(series: pd.Series) -> pd.Series:
+    """UTC sin zona, que es como DuckDB guarda los TIMESTAMP de este proyecto."""
     stamps = pd.to_datetime(series, utc=True)
     return stamps.dt.tz_convert("UTC").dt.tz_localize(None)

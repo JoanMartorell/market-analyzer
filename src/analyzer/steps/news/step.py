@@ -33,6 +33,7 @@ class News:
             raise StepError("no hay candidatos en el contexto: el paso screener debe ir antes")
 
         targets = self._targets(ctx, candidates)
+        ctx.data["news_targets"] = targets  # el paso dedup_sentiment pide por los mismos
         ctx.data["articles"] = pd.DataFrame(columns=list(NEWS_COLUMNS))
         if targets.empty:
             return StepOutcome(

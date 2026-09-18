@@ -50,8 +50,8 @@ news:
 
 llm:
   enabled: true
-  model: claude-opus-5
-  effort: low                      # medir esto antes de montar una cascada de modelos
+  model: claude-sonnet-5
+  effort: high                     # medir esto antes de montar una cascada de modelos
   max_tokens: 4096
   use_batch_api: true              # análisis nocturno: 50% de descuento
   prompt_caching: true
