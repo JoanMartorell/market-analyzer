@@ -1,0 +1,30 @@
+# Regla de ejemplo: sobreventa dentro de tendencia alcista.
+#
+# Las expresiones se parsean a AST y solo se evalúan nodos permitidos.
+# Nunca eval(). Variables disponibles: cualquier columna de la tabla de
+# indicadores (close, volume, rsi_14, sma_200, macd, macd_signal, avg_volume_20,
+# sector, ...). Funciones permitidas: las registradas en rules/functions.py.
+#
+# El hash sha256 de este fichero se guarda con cada señal que genere.
+version: 3
+
+id: oversold_uptrend
+description: RSI en sobreventa con precio sobre la media de 200 y cruce alcista de MACD
+window: 5                          # las condiciones deben cumplirse dentro de 5 sesiones
+
+conditions:
+  - expr: "rsi_14 < 30"
+    weight: 0.4
+  - expr: "close > sma_200"
+    weight: 0.3
+    required: true                 # si falla, score = 0 aunque el resto se cumpla
+  - expr: "bullish_cross(macd, macd_signal)"
+    weight: 0.3
+
+universe_filters:                  # se aplican antes de puntuar; reducen el universo
+  - "avg_volume_20 > 1_000_000"
+  - "sector != 'Financials'"
+
+output:
+  score_threshold: 0.7             # candidato si el score ponderado >= 0.7
+  direction: long

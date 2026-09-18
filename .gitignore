@@ -1,0 +1,29 @@
+# secretos
+.env
+.env.*
+!.env.example
+
+# datos locales
+data/
+*.duckdb
+*.duckdb.wal
+*.parquet
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+dist/
+build/
+*.egg-info/
+
+# herramientas
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# editores
+.vscode/
+.idea/

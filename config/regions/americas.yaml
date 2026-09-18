@@ -1,0 +1,37 @@
+# Ciclo Américas. Es el único activo hasta que lleve un mes reconciliando limpio.
+id: americas
+name: Américas
+enabled: true
+
+markets:
+  - mic: XNYS
+    calendar: XNYS                 # nombre de exchange_calendars
+    currency: USD
+  - mic: XNAS
+    calendar: XNAS
+    currency: USD
+
+schedule:
+  run_at: "20:15"                  # PROVISIONAL para probar serve; producción: "06:30"
+                                   # Hora local (settings.local_timezone). Entre comillas:
+                                   # sin ellas YAML lo lee como el entero 390.
+  execute_at: next_open            # señales del día D se ejecutan en la apertura de D+1
+  reevaluation_gate: null          # no hay otra sesión grande entre cierre y ejecución
+
+universe:
+  id: sp500
+  constituents_file: sp500_pit.parquet   # en data/universe/americas/; point-in-time, no la lista actual
+  min_avg_volume_20: 1_000_000
+
+providers:
+  prices: yfinance
+  fundamentals: sec_edgar
+  macro: fred
+  news: [yahoo_finance_rss, finnhub, cnbc_rss]
+
+news:
+  language: en
+  strategy: native                 # native | translate | technical_only
+
+rules:
+  - oversold_uptrend

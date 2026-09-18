@@ -1,0 +1,63 @@
+# ---------------------------------------------------------------------------
+# Proveedores de datos y fuentes de noticias.
+# api_key_env / user_agent_env indican qué variable de .env necesita cada uno.
+# El cargador comprueba que existan para todo lo que use una región activa.
+# ---------------------------------------------------------------------------
+version: 1
+
+providers:
+  yfinance:
+    kind: prices
+    monthly_cost_eur: 0
+    notes: Gratis. Fiable para USA, irregular fuera.
+
+  eodhd:
+    kind: prices
+    base_url: https://eodhd.com/api
+    api_key_env: EODHD_API_KEY
+    monthly_cost_eur: 100
+    notes: Cobertura global. Es el gasto más grande del proyecto, por encima de los tokens.
+
+  sec_edgar:
+    kind: fundamentals
+    base_url: https://data.sec.gov
+    user_agent_env: SEC_EDGAR_USER_AGENT   # la SEC exige identificarse; sin esto devuelve 403
+    rate_limit_per_second: 10
+    monthly_cost_eur: 0
+
+  fmp:
+    kind: fundamentals
+    base_url: https://financialmodelingprep.com/api/v3
+    api_key_env: FMP_API_KEY
+    monthly_cost_eur: 0
+
+  fred:
+    kind: macro
+    base_url: https://api.stlouisfed.org/fred
+    api_key_env: FRED_API_KEY
+    monthly_cost_eur: 0
+
+news_sources:
+  # reliability entra en la fórmula del representante del cluster (0.0 - 1.0)
+  yahoo_finance_rss:
+    kind: rss
+    url_template: "https://feeds.finance.yahoo.com/rss/2.0/headline?s={ticker}&region=US&lang=en-US"
+    per_ticker: true
+    reliability: 0.6
+    language: en
+
+  cnbc_rss:
+    kind: rss
+    url: "https://www.cnbc.com/id/100003114/device/rss/rss.html"
+    per_ticker: false
+    reliability: 0.7
+    language: en
+
+  finnhub:
+    kind: api
+    base_url: https://finnhub.io/api/v1
+    api_key_env: FINNHUB_API_KEY
+    per_ticker: true
+    reliability: 0.7
+    language: en
+    rate_limit_per_minute: 60      # free tier

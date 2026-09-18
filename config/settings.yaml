@@ -1,0 +1,71 @@
+# ---------------------------------------------------------------------------
+# Configuración global. Lo que depende de la región va en config/regions/.
+# Lo que es secreto (claves de API) va en .env, nunca aquí.
+# Las rutas relativas se resuelven desde la raíz del proyecto.
+# ---------------------------------------------------------------------------
+version: 1
+
+base_currency: EUR                 # todo retorno se normaliza a esta moneda
+local_timezone: Europe/Madrid      # zona horaria de los horarios de lanzamiento
+
+data:
+  dir: ./data                      # sobreescribible con MA_DATA_DIR
+  duckdb_file: market.duckdb
+  parquet_dir: parquet
+  staging_schema: staging          # ingesta cruda; nunca se lee para generar señales
+  prod_schema: prod                # solo se promueve tras pasar quality
+
+quality:                           # se falla en cerrado: si algo no cuadra, no hay señales
+  min_ticker_coverage: 0.98        # fracción de tickers esperados que deben llegar
+  max_daily_jump: 0.40             # salto de precio sin operación corporativa asociada
+  zero_volume_min_avg_volume: 1_000_000   # volumen 0 en un valor que mueve esto = feed roto
+  feed_date_must_be_last_session: true
+
+indicators:
+  lookback_days: 250               # recálculo incremental, no diez años
+  full_recompute_on_corporate_action: true
+
+screener:
+  max_candidates_per_region: 20
+  min_score: 0.0                   # el umbral real lo fija cada regla en output.score_threshold
+
+news:
+  only_candidates_and_open_positions: true
+  lookback_hours: 48
+  dedup:
+    minhash_threshold: 0.85
+    minhash_num_perm: 128
+    shingle_size: 3
+    embedding_model: sentence-transformers/all-MiniLM-L6-v2
+    embedding_cosine_threshold: 0.85
+    cluster_window_hours: 48       # misma noticia 3 semanas después = evento distinto
+  sentiment_model: ProsusAI/finbert
+  representative_weights:          # cómo se elige el artículo que representa al cluster
+    source_reliability: 0.5
+    is_oldest: 0.3
+    normalized_length: 0.2
+
+llm:
+  enabled: true
+  model: claude-opus-5
+  effort: low                      # medir esto antes de montar una cascada de modelos
+  max_tokens: 4096
+  use_batch_api: true              # análisis nocturno: 50% de descuento
+  prompt_caching: true
+  max_calls_per_cycle: 1
+  monthly_budget_eur: 25           # aviso si la estimación acumulada lo supera
+  prompt_file: prompts/analyst_system.md
+
+delivery:
+  channels: [console]              # PROVISIONAL para pruebas; producción: [telegram]
+  notify_on_failure: true          # el silencio no es éxito
+  notify_on_no_signals: true
+
+pipeline:
+  lock_dir: ./data/locks
+  fail_closed: true
+  max_runtime_minutes: 15
+
+scheduler:                         # analyzer serve
+  late_grace_minutes: 30           # si arranca hasta 30 min después de un run_at, lo lanza igual
+  heartbeat_seconds: 60            # PROVISIONAL para ver la espera en el log; producción: 300

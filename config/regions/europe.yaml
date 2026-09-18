@@ -1,0 +1,50 @@
+# Ciclo Europa. Apagado hasta que Américas lleve un mes limpio.
+# El incómodo: cierre 17:30, ejecución 09:00 del día siguiente, con toda la sesión
+# americana entremedias. Por eso lleva gate de reevaluación.
+id: europe
+name: Europa
+enabled: true                      # PROVISIONAL para probar serve; producción: false
+
+markets:
+  - { mic: XETR, calendar: XETR, currency: EUR }   # Xetra
+  - { mic: XPAR, calendar: XPAR, currency: EUR }   # Euronext París
+  - { mic: XAMS, calendar: XAMS, currency: EUR }   # Euronext Ámsterdam
+  - { mic: XMAD, calendar: XMAD, currency: EUR }   # BME
+  - { mic: XMIL, calendar: XMIL, currency: EUR }   # Borsa Italiana
+  - { mic: XLON, calendar: XLON, currency: GBP }   # LSE
+  - { mic: XSWX, calendar: XSWX, currency: CHF }   # SIX
+  - { mic: XSTO, calendar: XSTO, currency: SEK }   # Estocolmo
+  - { mic: XOSL, calendar: XOSL, currency: NOK }   # Oslo
+  - { mic: XCSE, calendar: XCSE, currency: DKK }   # Copenhague
+  - { mic: XHEL, calendar: XHEL, currency: EUR }   # Helsinki
+  - { mic: XBRU, calendar: XBRU, currency: EUR }   # Euronext Bruselas
+  - { mic: XWBO, calendar: XWBO, currency: EUR }   # Viena
+  - { mic: XDUB, calendar: XDUB, currency: EUR }   # Euronext Dublín
+  - { mic: XLIS, calendar: XLIS, currency: EUR }   # Euronext Lisboa
+  - { mic: XWAR, calendar: XWAR, currency: PLN }   # Varsovia
+
+schedule:
+  run_at: "20:30"                  # PROVISIONAL para probar serve; producción: "19:30"
+  execute_at: next_open
+  reevaluation_gate:
+    at: "08:45"                    # antes de la apertura de las 09:00
+    reference: us_futures          # qué se mira para decidir si el contexto cambió
+    cancel_if_abs_move_above: 0.02 # anula señales si los futuros se movieron más de un 2%
+
+universe:
+  id: stoxx600
+  constituents_file: stoxx600_pit.parquet         # en data/universe/europe/
+  min_avg_volume_20: 500_000
+
+providers:
+  prices: yfinance                 # PROVISIONAL; producción: eodhd (yfinance es irregular fuera de USA)
+  fundamentals: null
+  macro: fred
+  news: [finnhub]
+
+news:
+  language: en
+  strategy: native                 # la prensa financiera europea relevante está en inglés
+
+rules:
+  - oversold_uptrend

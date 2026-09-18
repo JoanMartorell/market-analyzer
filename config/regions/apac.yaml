@@ -1,0 +1,36 @@
+# Ciclo Asia-Pacífico. Apagado. Se enciende el último.
+# Calendarios difíciles: Golden Week en Japón, semana de octubre en China, pausa
+# de comida en Tokio. exchange_calendars lo cubre; nunca usar weekday() < 5.
+id: apac
+name: Asia-Pacífico
+enabled: true                      # PROVISIONAL para probar serve; producción: false
+
+markets:
+  - { mic: XTKS, calendar: XTKS, currency: JPY }   # Tokio
+  - { mic: XHKG, calendar: XHKG, currency: HKD }   # Hong Kong
+  - { mic: XASX, calendar: XASX, currency: AUD }   # Sídney
+  - { mic: XKRX, calendar: XKRX, currency: KRW }   # Corea
+
+schedule:
+  run_at: "20:45"                  # PROVISIONAL para probar serve; producción: "10:30"
+                                   # (cierres entre 07:00 y 09:00 hora peninsular)
+  execute_at: next_open
+  reevaluation_gate: null
+
+universe:
+  id: apac_large_cap
+  constituents_file: apac_large_cap_pit.parquet   # en data/universe/apac/
+  min_avg_volume_20: 500_000
+
+providers:
+  prices: yfinance                 # PROVISIONAL; producción: eodhd (cobertura global de pago)
+  fundamentals: null
+  macro: null
+  news: []
+
+news:
+  language: multi
+  strategy: technical_only         # FinBERT es monolingüe; sin traducción, solo reglas técnicas
+
+rules:
+  - oversold_uptrend
