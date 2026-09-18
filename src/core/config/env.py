@@ -46,7 +46,12 @@ class Env(BaseSettings):
         if isinstance(value, SecretStr):
             value = value.get_secret_value()
         if isinstance(value, str):
-            return value or None
+            value = value.strip()
+            # python-dotenv convierte ``KEY=   # comentario`` en el texto del
+            # comentario. Un secreto nunca empieza por '#': es una línea vacía.
+            if not value or value.startswith("#"):
+                return None
+            return value
         return None
 
     def has(self, env_name: str) -> bool:
