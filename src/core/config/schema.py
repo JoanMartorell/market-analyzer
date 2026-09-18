@@ -47,6 +47,10 @@ class IndicatorSettings(StrictModel):
     full_recompute_on_corporate_action: bool = True
 
 
+class SnapshotSettings(StrictModel):
+    min_coverage: float = Field(0.95, ge=0.0, le=1.0)  # fracción del universo con fila de hoy
+
+
 class ScreenerSettings(StrictModel):
     max_candidates_per_region: int = Field(20, ge=1)
     min_score: float = Field(0.0, ge=0.0, le=1.0)
@@ -120,6 +124,7 @@ class Settings(StrictModel):
     data: DataSettings
     quality: QualitySettings
     indicators: IndicatorSettings
+    snapshot: SnapshotSettings = SnapshotSettings()
     screener: ScreenerSettings
     news: NewsSettings
     llm: LLMSettings

@@ -25,6 +25,9 @@ indicators:
   lookback_days: 250               # recálculo incremental, no diez años
   full_recompute_on_corporate_action: true
 
+snapshot:                          # panel point-in-time que ve el screener
+  min_coverage: 0.95               # fracción del universo con indicadores de hoy; por debajo, sin panel
+
 screener:
   max_candidates_per_region: 20
   min_score: 0.0                   # el umbral real lo fija cada regla en output.score_threshold

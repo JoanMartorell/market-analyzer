@@ -22,6 +22,7 @@ from analyzer.storage.prices import (
     UNKNOWN_MIC,
     PriceStore,
 )
+from analyzer.storage.snapshots import UNIVERSE_COLUMNS, SnapshotRunStore, SnapshotStore
 from analyzer.storage.sql import check_identifier
 from analyzer.storage.table import Table
 from core.config import AppConfig
@@ -42,10 +43,13 @@ __all__ = [
     "LOADED_COLUMNS",
     "OPTIONAL_PRICE_COLUMNS",
     "PRICE_COLUMNS",
+    "UNIVERSE_COLUMNS",
     "UNKNOWN_MIC",
     "CorporateActionStore",
     "IndicatorStore",
     "PriceStore",
+    "SnapshotRunStore",
+    "SnapshotStore",
     "Table",
     "check_identifier",
     "connect",

@@ -32,6 +32,17 @@ class Table:
         """Columnas a añadir tras el DDL. Una subclase puede calcularlas en tiempo de ejecución."""
         return self.COLUMNS_ADDED
 
+    @contextmanager
+    def transaction(self) -> Iterator[None]:
+        """Agrupa varias escrituras: o entran todas o ninguna."""
+        self._con.begin()
+        try:
+            yield
+        except BaseException:
+            self._con.rollback()
+            raise
+        self._con.commit()
+
     def last_dates(self, keys: pd.DataFrame | None = None) -> pd.DataFrame:
         """Última ``date`` guardada por clave: columnas ticker, mic, last_date (``date``).
 
