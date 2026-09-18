@@ -115,6 +115,14 @@ class LLMSettings(StrictModel):
     pricing: LlmPricing
 
 
+class ReconcileSettings(StrictModel):
+    """Paso 12: apertura real de la sesión de ejecución frente al cierre asumido."""
+
+    # Gap absoluto (apertura / cierre - 1) por encima del cual la señal queda
+    # "desviada": el precio al que se ejecutaba ya no era el que vio la regla.
+    max_open_gap: float = Field(0.02, gt=0.0, lt=1.0)
+
+
 class DeliverySettings(StrictModel):
     # Nombres de canal del registro de delivery. Se validan allí, no aquí:
     # core.config no importa delivery.
@@ -145,6 +153,7 @@ class Settings(StrictModel):
     screener: ScreenerSettings
     news: NewsSettings
     llm: LLMSettings
+    reconcile: ReconcileSettings = ReconcileSettings()
     delivery: DeliverySettings
     pipeline: PipelineSettings
     scheduler: SchedulerSettings = SchedulerSettings()

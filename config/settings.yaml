@@ -66,6 +66,9 @@ llm:
     cache_read_multiplier: 0.20
     batch_multiplier: 1
 
+reconcile:                         # paso 12: apertura real de la ejecución vs cierre asumido
+  max_open_gap: 0.02               # gap absoluto por encima del cual la señal queda "desviada"
+
 delivery:
   channels: [console]              # PROVISIONAL para pruebas; producción: [telegram]
   notify_on_failure: true          # el silencio no es éxito

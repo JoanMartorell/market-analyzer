@@ -22,6 +22,7 @@ from core.app import (
     default_session,
     delivery_env_requirements,
     prices_status,
+    reconcile_region,
     run_region,
 )
 from core.config import AppConfig, ConfigError, Region
@@ -125,6 +126,28 @@ def run(
         day = as_of.date() if as_of else default_session(cfg, region)
         result = run_region(cfg, region, day)
     except (ConfigError, DeliveryError) as exc:
+        raise _fail(str(exc), 1) from None
+
+    typer.echo(result.summary())
+    raise typer.Exit(code=0 if result.ok else 1)
+
+
+@app.command()
+def reconcile(
+    region: RegionOption,
+    as_of: DateOption = None,
+    config_dir: ConfigDirOption = None,
+) -> None:
+    """Concilia las señales que se ejecutaban en una sesión con su apertura real (paso 12).
+
+    El ciclo diario ya lo hace al terminar; esto sirve para repetirlo o para
+    un día en que el ciclo no llegó al final. Necesita las velas de la sesión en prod.
+    """
+    try:
+        cfg = bootstrap(config_dir)
+        day = as_of.date() if as_of else default_session(cfg, region)
+        result = reconcile_region(cfg, region, day)
+    except ConfigError as exc:
         raise _fail(str(exc), 1) from None
 
     typer.echo(result.summary())

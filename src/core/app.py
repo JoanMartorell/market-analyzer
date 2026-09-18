@@ -16,12 +16,12 @@ import structlog
 
 from analyzer.engine import Pipeline, PipelineResult, StepContext
 from analyzer.sessions import last_closed_session
-from analyzer.steps import build_daily_steps
+from analyzer.steps import build_daily_steps, build_reconcile_steps
 from analyzer.steps.ingest import IngestReport, get_price_provider, ingest_prices
 from analyzer.steps.ingest.service import universe_keys
 from analyzer.storage import PriceStore, connect
 from analyzer.universe import load_constituents, members_as_of, members_between
-from core.config import AppConfig, ConfigError, load_config
+from core.config import AppConfig, ConfigError, Region, load_config
 from core.logs import configure_logging
 from delivery import Dispatcher, Message, build_dispatcher, required_env
 
@@ -73,10 +73,8 @@ def run_region(
     *,
     dispatcher: Dispatcher | None = None,
 ) -> PipelineResult:
-    """Ejecuta el ciclo diario de una región y entrega el resultado."""
-    region = cfg.regions.get(region_id)
-    if region is None:
-        raise ConfigError(f"región desconocida: {region_id!r}")
+    """Ejecuta el ciclo diario de una región, concilia la sesión anterior y entrega el resultado."""
+    region = _region(cfg, region_id)
     if not region.enabled:
         raise ConfigError(f"región {region_id!r} está desactivada (enabled: false)")
 
@@ -87,10 +85,36 @@ def run_region(
     ctx = StepContext(cfg=cfg, region=region, as_of=as_of)
     log.info("pipeline.start", region=region_id, as_of=str(as_of))
     result = Pipeline(build_daily_steps()).run(ctx)
+    if result.ok and not result.stopped_early:
+        # Paso 12: las señales de la sesión anterior se ejecutaban en la apertura
+        # de as_of, que el ciclo acaba de traer a prod. Es un pipeline aparte con su
+        # propio contexto; sus pasos se suman al informe para que llegue en un mensaje.
+        result.reports.extend(reconcile_region(cfg, region_id, as_of).reports)
     log.info("pipeline.end", region=region_id, ok=result.ok, stopped=result.stopped_early)
 
     notify(cfg, result, dispatcher)
     return result
+
+
+def reconcile_region(cfg: AppConfig, region_id: str, as_of: date) -> PipelineResult:
+    """Concilia las señales que se ejecutaban en la sesión ``as_of`` con su apertura real.
+
+    Lo lanza ``run_region`` al final de cada ciclo y ``analyzer reconcile``
+    a mano. Necesita en prod las velas de ``as_of``, que trae el ciclo
+    diario de esa sesión; sin ellas el paso falla en cerrado.
+    """
+    ctx = StepContext(cfg=cfg, region=_region(cfg, region_id), as_of=as_of)
+    log.info("reconcile.start", region=region_id, as_of=str(as_of))
+    result = Pipeline(build_reconcile_steps()).run(ctx)
+    log.info("reconcile.end", region=region_id, ok=result.ok)
+    return result
+
+
+def _region(cfg: AppConfig, region_id: str) -> Region:
+    region = cfg.regions.get(region_id)
+    if region is None:
+        raise ConfigError(f"región desconocida: {region_id!r}")
+    return region
 
 
 def notify(cfg: AppConfig, result: PipelineResult, dispatcher: Dispatcher) -> None:
