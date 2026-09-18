@@ -58,6 +58,10 @@ class AppConfig:
     def lock_dir(self) -> Path:
         return self._resolve(self.settings.pipeline.lock_dir)
 
+    @property
+    def prompt_path(self) -> Path:
+        return self._resolve(self.settings.llm.prompt_file)
+
     def rules_for(self, region: Region) -> list[Rule]:
         return [self.rules[rid] for rid in region.rules]
 

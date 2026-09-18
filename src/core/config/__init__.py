@@ -14,6 +14,8 @@ from core.config.loader import AppConfig, ConfigError, load_config
 from core.config.schema import (
     Condition,
     DedupSettings,
+    LlmPricing,
+    LLMSettings,
     Market,
     NewsSettings,
     NewsSource,
@@ -31,6 +33,8 @@ __all__ = [
     "ConfigError",
     "DedupSettings",
     "Env",
+    "LLMSettings",
+    "LlmPricing",
     "Market",
     "NewsSettings",
     "NewsSource",

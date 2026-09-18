@@ -86,16 +86,33 @@ class NewsSettings(StrictModel):
     representative_weights: RepresentativeWeights
 
 
+class LlmPricing(StrictModel):
+    """Coste estimado en EUR por millón de tokens.
+
+    La API no devuelve importes, solo tokens, así que el precio se pone a
+    mano desde la tarifa del modelo. Es una estimación para vigilar el
+    presupuesto, no una factura: si cambia la tarifa, se cambia aquí.
+    """
+
+    input_per_mtok: float = Field(ge=0.0)
+    output_per_mtok: float = Field(ge=0.0)
+    cache_write_multiplier: float = Field(1.25, ge=0.0)  # escribir en caché cuesta más
+    cache_read_multiplier: float = Field(0.1, ge=0.0)  # leerla, mucho menos
+    batch_multiplier: float = Field(0.5, ge=0.0)  # la Batch API descuenta el 50%
+
+
 class LLMSettings(StrictModel):
     enabled: bool = True
     model: str = "claude-opus-5"
     effort: Literal["low", "medium", "high", "xhigh", "max"] = "low"
     max_tokens: int = Field(4096, ge=256)
     use_batch_api: bool = True
+    batch_wait_minutes: int = Field(10, ge=1)  # si el lote tarda más, se llama en directo
     prompt_caching: bool = True
     max_calls_per_cycle: int = Field(1, ge=0)
     monthly_budget_eur: float = Field(25.0, ge=0.0)
     prompt_file: Path
+    pricing: LlmPricing
 
 
 class DeliverySettings(StrictModel):

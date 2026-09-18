@@ -52,12 +52,19 @@ llm:
   enabled: true
   model: claude-sonnet-5
   effort: high                     # medir esto antes de montar una cascada de modelos
-  max_tokens: 4096
+  max_tokens: 8192
   use_batch_api: true              # análisis nocturno: 50% de descuento
+  batch_wait_minutes: 10           # si el lote tarda más, se repite la llamada en directo
   prompt_caching: true
   max_calls_per_cycle: 1
   monthly_budget_eur: 25           # aviso si la estimación acumulada lo supera
   prompt_file: prompts/analyst_system.md
+  pricing:                         # EUR por millón de tokens; la API solo devuelve tokens
+    input_per_mtok: 2.00           # revisar en platform.claude.com/pricing al cambiar de modelo
+    output_per_mtok: 10.00
+    cache_write_multiplier: 2.50
+    cache_read_multiplier: 0.20
+    batch_multiplier: 1
 
 delivery:
   channels: [console]              # PROVISIONAL para pruebas; producción: [telegram]

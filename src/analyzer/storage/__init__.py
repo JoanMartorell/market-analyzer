@@ -21,6 +21,7 @@ from analyzer.storage.clusters import (
 )
 from analyzer.storage.corporate_actions import ACTION_COLUMNS, CorporateActionStore
 from analyzer.storage.indicators import BASE_COLUMNS, IndicatorStore
+from analyzer.storage.llm_calls import CALL_COLUMNS, LlmCallStore
 from analyzer.storage.news import LOADED_NEWS_COLUMNS, NEWS_COLUMNS, NewsStore, naive_utc
 from analyzer.storage.prices import (
     LOADED_COLUMNS,
@@ -47,6 +48,7 @@ def connect(cfg: AppConfig) -> duckdb.DuckDBPyConnection:
 __all__ = [
     "ACTION_COLUMNS",
     "BASE_COLUMNS",
+    "CALL_COLUMNS",
     "CLUSTER_COLUMNS",
     "LOADED_COLUMNS",
     "LOADED_NEWS_COLUMNS",
@@ -58,6 +60,7 @@ __all__ = [
     "UNKNOWN_MIC",
     "CorporateActionStore",
     "IndicatorStore",
+    "LlmCallStore",
     "NewsClusterMemberStore",
     "NewsClusterStore",
     "NewsStore",
