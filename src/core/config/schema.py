@@ -199,9 +199,16 @@ class Universe(StrictModel):
 
 class RegionProviders(StrictModel):
     prices: str
+    prices_fallback: str | None = None  # rescata lo que ``prices`` deje sin la vela del día
     fundamentals: str | None = None
     macro: str | None = None
     news: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _fallback_is_another_provider(self) -> RegionProviders:
+        if self.prices_fallback is not None and self.prices_fallback == self.prices:
+            raise ValueError("prices_fallback no puede ser el mismo proveedor que prices")
+        return self
 
 
 class RegionNews(StrictModel):
@@ -299,6 +306,7 @@ class Provider(StrictModel):
     api_key_env: str | None = None
     user_agent_env: str | None = None
     rate_limit_per_second: float | None = Field(default=None, gt=0.0)
+    daily_call_limit: int | None = Field(default=None, gt=0)  # cupo del plan; None = sin cupo
     monthly_cost_eur: float = Field(0.0, ge=0.0)
     notes: str = ""
 

@@ -18,7 +18,10 @@ def _clock(hour: int, minute: int = 0) -> datetime:
 
 
 def _with_schedule(cfg: AppConfig, run_at: Mapping[str, time]) -> AppConfig:
-    """Copia de la configuración con solo las regiones indicadas activas y sus horas."""
+    """Copia de la configuración con solo las regiones indicadas activas y sus horas.
+
+    La entrega se fuerza a consola: el YAML puede tener telegram, y aquí no hay credenciales.
+    """
     regions = {}
     for rid, region in cfg.regions.items():
         if rid in run_at:
@@ -26,7 +29,9 @@ def _with_schedule(cfg: AppConfig, run_at: Mapping[str, time]) -> AppConfig:
             regions[rid] = region.model_copy(update={"enabled": True, "schedule": schedule})
         else:
             regions[rid] = region.model_copy(update={"enabled": False})
-    return replace(cfg, regions=regions)
+    delivery = cfg.settings.delivery.model_copy(update={"channels": ["console"]})
+    settings = cfg.settings.model_copy(update={"delivery": delivery})
+    return replace(cfg, regions=regions, settings=settings)
 
 
 class FakeClock:

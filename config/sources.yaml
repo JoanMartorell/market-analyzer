@@ -15,8 +15,11 @@ providers:
     kind: prices
     base_url: https://eodhd.com/api
     api_key_env: EODHD_API_KEY
-    monthly_cost_eur: 100
-    notes: Cobertura global. Es el gasto más grande del proyecto, por encima de los tokens.
+    daily_call_limit: 20           # plan gratuito: 20 llamadas/día, una por valor; sin descargas por bolsa
+    monthly_cost_eur: 0
+    notes: >-
+      Cobertura global, pero en el plan gratuito solo sirve de rescate de los valores que
+      yfinance deje sin la vela del día. Alimentar Europa entera exige el plan de pago (bulk).
 
   sec_edgar:
     kind: fundamentals
@@ -29,6 +32,8 @@ providers:
     kind: fundamentals
     base_url: https://financialmodelingprep.com/api/v3
     api_key_env: FMP_API_KEY
+    daily_call_limit: 250          # plan gratuito; además rechaza símbolos fuera de USA (402)
+    notes: Ningún paso lo usa todavía; solo serviría para fundamentales de USA.
     monthly_cost_eur: 0
 
   fred:

@@ -1,9 +1,9 @@
-# Ciclo Asia-Pacífico. Apagado. Se enciende el último.
+# Ciclo Asia-Pacífico.
 # Calendarios difíciles: Golden Week en Japón, semana de octubre en China, pausa
 # de comida en Tokio. exchange_calendars lo cubre; nunca usar weekday() < 5.
 id: apac
 name: Asia-Pacífico
-enabled: false
+enabled: true
 
 markets:
   - { mic: XTKS, calendar: XTKS, currency: JPY }   # Tokio
@@ -23,7 +23,8 @@ universe:
   min_avg_volume_20: 500_000
 
 providers:
-  prices: yfinance                 # PROVISIONAL; producción: eodhd (cobertura global de pago)
+  prices: yfinance                 # gratis y por lotes; cubre bien Tokio, Hong Kong, Sídney y Seúl
+  prices_fallback: eodhd           # rescata lo que Yahoo deje sin la vela del día (cupo diario)
   fundamentals: null
   macro: null
   news: []

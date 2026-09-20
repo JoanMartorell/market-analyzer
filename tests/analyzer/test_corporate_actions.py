@@ -248,7 +248,7 @@ def cfg_tmp(cfg: AppConfig, tmp_path: Path) -> AppConfig:
 def test_step_updates_quarantine_and_recompute_set(
     cfg_tmp: AppConfig, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(PROVIDER_TARGET, lambda _id: FakeProvider())
+    monkeypatch.setattr(PROVIDER_TARGET, lambda _id, **_: FakeProvider())
     with connect(cfg_tmp) as con:
         staging = PriceStore(con, "staging")
         staging.upsert(_bars("NVDA", days=29, end=AS_OF - timedelta(days=1)), ingested_at=OLD_LOAD)

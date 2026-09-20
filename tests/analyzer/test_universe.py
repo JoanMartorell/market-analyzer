@@ -1,5 +1,6 @@
 """Fuente y enriquecedores del S&P 500, construcción genérica y consultas point-in-time."""
 
+import json
 from dataclasses import replace
 from datetime import date
 from pathlib import Path
@@ -19,6 +20,7 @@ from analyzer.universe import (
     members_as_of,
 )
 from analyzer.universe.helpers import canonical_ticker, merge_fill
+from analyzer.universe.sources.europe import EUROPE_MARKETS
 from analyzer.universe.sources.sp500.github import parse_intervals_csv
 from analyzer.universe.sources.sp500.sec import apply_sec, parse_sec_json
 from analyzer.universe.sources.sp500.wikipedia import (
@@ -28,6 +30,7 @@ from analyzer.universe.sources.sp500.wikipedia import (
     apply_wikipedia,
     parse_wikipedia_html,
 )
+from analyzer.universe.sources.yahoo_symbols import YahooSymbols
 from core.config import AppConfig
 
 INTERVALS_CSV = """ticker,start_date,end_date
@@ -264,3 +267,96 @@ def test_members_between_includes_departed_members() -> None:
     earlier = members_between(table, date(2019, 1, 1), date(2026, 9, 17))["ticker"].tolist()
     assert "GONE" not in later
     assert "GONE" in earlier
+
+
+# --- símbolos de Yahoo --------------------------------------------------------
+
+
+def _known_prices(keys: pd.DataFrame, start: date, end: date) -> pd.DataFrame:
+    """Yahoo solo conoce SAP tal cual; el resto hay que buscarlo."""
+    return pd.DataFrame({"ticker": ["SAP"], "mic": ["XETR"], "date": [pd.Timestamp(end)]})
+
+
+QUOTES: dict[str, list[dict[str, str]] | None] = {
+    "Air Liquide": [{"symbol": "AI.PA", "quoteType": "EQUITY"}, {"symbol": "AIL.F"}],
+    "argenx": [
+        {"symbol": "ARGX", "quoteType": "EQUITY"},  # sin sufijo = USA, nunca vale
+        {"symbol": "ARGX.BR", "quoteType": "EQUITY"},
+    ],
+    "Hiscox": [
+        {"symbol": "HCXLY", "quoteType": "EQUITY"},
+        {"symbol": "HSX.L", "quoteType": "EQUITY"},
+    ],
+    "TUI Group": [],  # por nombre nada; por ticker sí
+    "TUI": [{"symbol": "TUI1.DE", "quoteType": "EQUITY"}],
+    "Credit Agricole": [{"symbol": "ACA.PA", "quoteType": "EQUITY"}],  # sin acento
+    "Nadie": [{"symbol": "NADIE.PA", "quoteType": "ETF"}],
+    "Fallo": None,
+}
+
+
+def _table() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "ticker": ["SAP", "AIRP", "ARGX", "HSX", "TUI", "CAGR", "ZZZ", "FFF"],
+            "name": [
+                "SAP SE",
+                "Air Liquide",
+                "argenx",
+                "Hiscox",
+                "TUI Group",
+                "Crédit Agricole",
+                "Nadie",
+                "Fallo",
+            ],
+            "mic": ["XETR", "XPAR", "XAMS", None, "XETR", "XPAR", "XPAR", "XPAR"],
+            "currency": ["EUR", "EUR", "EUR", None, "EUR", "EUR", "EUR", "EUR"],
+        }
+    )
+
+
+def _enricher(searches: list[str]) -> YahooSymbols:
+    def search(_client: httpx.Client, query: str) -> list[dict[str, str]] | None:
+        searches.append(query)
+        return QUOTES.get(query, [])
+
+    return YahooSymbols(
+        markets=EUROPE_MARKETS, fetch_prices=_known_prices, search=search, pause_seconds=0.0
+    )
+
+
+def test_yahoo_symbols_fixes_tickers_relocates_and_drops_the_dead(tmp_path: Path) -> None:
+    searches: list[str] = []
+    offline = httpx.Client(transport=httpx.MockTransport(lambda _r: httpx.Response(500)))
+
+    out, notes = _enricher(searches).enrich(
+        _table(), offline, FetchContext(today=TODAY, universe_dir=tmp_path)
+    )
+
+    by_name = out.set_index("name")
+    assert by_name.loc["SAP SE", "ticker"] == "SAP"
+    assert list(by_name.loc["Air Liquide", ["ticker", "mic"]]) == ["AI", "XPAR"]
+    assert list(by_name.loc["argenx", ["ticker", "mic", "currency"]]) == ["ARGX", "XBRU", "EUR"]
+    assert list(by_name.loc["Hiscox", ["ticker", "mic", "currency"]]) == ["HSX", "XLON", "GBP"]
+    assert by_name.loc["TUI Group", "ticker"] == "TUI1"  # por ticker, en su bolsa
+    assert by_name.loc["Crédit Agricole", "ticker"] == "ACA"  # buscado sin acento
+    assert "Nadie" not in by_name.index  # búsqueda correcta sin resultado: fuera
+    assert by_name.loc["Fallo", "ticker"] == "FFF"  # búsqueda fallida: se queda como estaba
+    assert notes["dropped"] == ["ZZZ@XPAR"]
+    assert notes["search_failed"] == ["FFF@XPAR"]
+    assert notes["relocated"] == ["ARGX@XAMS -> XBRU", "HSX@? -> XLON"]
+    assert notes["resolved"][0] == "AIRP@XPAR -> AI@XPAR"
+    assert "Credit Agricole" in searches and "Crédit Agricole" not in searches
+    assert searches.index("TUI Group") < searches.index("TUI")
+
+    # La memoria guarda solo lo resuelto, y el siguiente build no vuelve a buscar.
+    cache = json.loads((tmp_path / "yahoo_symbols.json").read_text(encoding="utf-8"))
+    assert cache["AIRP@XPAR"] == ["AI", "XPAR"]
+    assert "ZZZ@XPAR" not in cache and "FFF@XPAR" not in cache
+    again: list[str] = []
+    out2, notes2 = _enricher(again).enrich(
+        _table(), offline, FetchContext(today=TODAY, universe_dir=tmp_path)
+    )
+    assert notes2["from_cache"] == 5
+    assert sorted(again) == ["Fallo", "Nadie", "ZZZ"]  # ZZZ: por nombre y por ticker
+    assert out2["ticker"].tolist() == out["ticker"].tolist()

@@ -1,9 +1,9 @@
-# Ciclo Europa. Apagado hasta que Américas lleve un mes limpio.
+# Ciclo Europa.
 # El incómodo: cierre 17:30, ejecución 09:00 del día siguiente, con toda la sesión
 # americana entremedias. Por eso lleva gate de reevaluación.
 id: europe
 name: Europa
-enabled: false
+enabled: true
 
 markets:
   - { mic: XETR, calendar: XETR, currency: EUR }   # Xetra
@@ -37,7 +37,8 @@ universe:
   min_avg_volume_20: 500_000
 
 providers:
-  prices: yfinance                 # PROVISIONAL; producción: eodhd (yfinance es irregular fuera de USA)
+  prices: yfinance                 # gratis y por lotes; en Europa a veces llega con días de retraso
+  prices_fallback: eodhd           # rescata lo que Yahoo deje sin la vela del día (cupo diario)
   fundamentals: null
   macro: fred
   news: [finnhub]

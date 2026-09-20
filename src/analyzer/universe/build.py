@@ -52,7 +52,11 @@ def build_universe(
     today: date | None = None,
 ) -> BuildReport:
     spec = get_universe(region.universe.id)
-    ctx = FetchContext(today=today or datetime.now(UTC).date(), user_agent=user_agent)
+    ctx = FetchContext(
+        today=today or datetime.now(UTC).date(),
+        user_agent=user_agent,
+        universe_dir=out_path.parent,
+    )
 
     context = (
         nullcontext(client)

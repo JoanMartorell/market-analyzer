@@ -5,16 +5,19 @@ from datetime import date
 from pathlib import Path
 
 import duckdb
+import httpx
 import pandas as pd
 import pytest
 
 from analyzer.engine import StepContext, StepError
 from analyzer.steps.ingest import Ingest, ingest_prices, lookback_start
-from analyzer.steps.ingest.providers import get_price_provider
+from analyzer.steps.ingest.providers import DailyBudget, EodhdProvider, get_price_provider
 from analyzer.steps.ingest.providers.base import ALL_FETCH_COLUMNS, FETCH_COLUMNS
-from analyzer.steps.ingest.providers.yfinance import YFinanceProvider, reshape_download, yf_symbol
+from analyzer.steps.ingest.providers.eodhd import eodhd_symbol
+from analyzer.steps.ingest.providers.yfinance import YFinanceProvider, reshape_download
 from analyzer.steps.ingest.service import plan_fetch
-from analyzer.storage import UNKNOWN_MIC, PriceStore, connect
+from analyzer.storage import UNKNOWN_MIC, ApiCallStore, PriceStore, connect
+from analyzer.yahoo import yf_symbol
 from core.config import AppConfig, Env
 
 PROVIDER_TARGET = "analyzer.steps.ingest.step.get_price_provider"
@@ -121,11 +124,17 @@ def test_plan_fetch_new_incremental_and_up_to_date() -> None:
 
 
 class FakeProvider:
-    name = "fake"
-
-    def __init__(self, closes: dict[str, float] | None = None) -> None:
+    def __init__(
+        self,
+        closes: dict[str, float] | None = None,
+        *,
+        name: str = "fake",
+        bar_dates: dict[str, date] | None = None,  # valores cuya última vela no llega a end
+    ) -> None:
+        self.name = name
         self.calls: list[tuple[list[str], date, date]] = []
         self.closes = closes if closes is not None else {"AAPL": 100.0, "SAN": 5.0}
+        self.bar_dates = bar_dates or {}
 
     def fetch(self, keys: pd.DataFrame, start: date, end: date) -> pd.DataFrame:
         self.calls.append((keys["ticker"].tolist(), start, end))
@@ -133,7 +142,7 @@ class FakeProvider:
             {
                 "ticker": t,
                 "mic": m,
-                "date": pd.Timestamp(end),
+                "date": pd.Timestamp(self.bar_dates.get(t, end)),
                 "open": c,
                 "high": c,
                 "low": c,
@@ -206,7 +215,7 @@ def test_step_writes_to_staging_and_creates_data_dir(
     cfg_tmp: AppConfig, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     provider = FakeProvider()
-    monkeypatch.setattr(PROVIDER_TARGET, lambda _id: provider)
+    monkeypatch.setattr(PROVIDER_TARGET, lambda _id, **_: provider)
     ctx = _ctx(cfg_tmp)
 
     outcome = Ingest().run(ctx)
@@ -228,7 +237,7 @@ def test_step_requires_universe(cfg_tmp: AppConfig) -> None:
 def test_step_fails_closed_when_nothing_arrives(
     cfg_tmp: AppConfig, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(PROVIDER_TARGET, lambda _id: FakeProvider(closes={}))
+    monkeypatch.setattr(PROVIDER_TARGET, lambda _id, **_: FakeProvider(closes={}))
 
     with pytest.raises(StepError, match="no devolvió datos"):
         Ingest().run(_ctx(cfg_tmp))
@@ -236,7 +245,7 @@ def test_step_fails_closed_when_nothing_arrives(
 
 def test_step_rejects_unimplemented_provider(cfg_tmp: AppConfig) -> None:
     americas = cfg_tmp.regions["americas"]
-    providers = americas.providers.model_copy(update={"prices": "eodhd"})
+    providers = americas.providers.model_copy(update={"prices": "nope"})
     region = americas.model_copy(update={"providers": providers})
     ctx = StepContext(cfg=cfg_tmp, region=region, as_of=date(2026, 9, 17))
     ctx.data["universe"] = UNIVERSE
@@ -249,3 +258,153 @@ def test_registry_knows_yfinance() -> None:
     assert get_price_provider("yfinance").name == "yfinance"
     with pytest.raises(ValueError, match="disponibles"):
         get_price_provider("nope")
+
+
+# --- rescate con un segundo proveedor ------------------------------------------
+
+
+def test_fallback_rescues_keys_without_the_day_bar(memory_store: PriceStore) -> None:
+    as_of = date(2026, 9, 17)
+    main = FakeProvider(bar_dates={"SAN": date(2026, 9, 15)})  # SAN llega con dos días de retraso
+    rescue = FakeProvider(closes={"SAN": 6.0}, name="rescue")
+
+    report = ingest_prices(
+        UNIVERSE,
+        as_of,
+        provider=main,
+        store=memory_store,
+        lookback_days=250,
+        fallback=rescue,
+        fallback_markets=["XMAD", "XNAS"],
+    )
+
+    assert [c[0] for c in rescue.calls] == [["SAN"]]  # GHOST no tiene bolsa con sesión
+    assert report.rescued == 1
+    assert report.stale == ()
+    assert report.rows == 3
+    assert "1 rescatados por rescue" in report.summary()
+    saved = memory_store.load(keys=pd.DataFrame({"ticker": ["SAN"], "mic": ["XMAD"]}))
+    by_day = dict(zip(saved["date"].dt.date, saved["source"], strict=True))
+    assert by_day == {date(2026, 9, 15): "fake", as_of: "rescue"}
+
+
+def test_fallback_only_asks_for_markets_with_a_session(memory_store: PriceStore) -> None:
+    main = FakeProvider(bar_dates={"SAN": date(2026, 9, 15)})
+    rescue = FakeProvider(closes={"SAN": 6.0}, name="rescue")
+
+    report = ingest_prices(
+        UNIVERSE,
+        date(2026, 9, 17),
+        provider=main,
+        store=memory_store,
+        lookback_days=250,
+        fallback=rescue,
+        fallback_markets=["XNAS"],
+    )
+
+    assert rescue.calls == []
+    assert report.rescued == 0
+    assert report.stale == ("SAN@XMAD",)
+    assert "sin llegar a 2026-09-17: 1" in report.summary()
+
+
+# --- eodhd -------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("ticker", "mic", "expected"),
+    [
+        ("SAP", "XETR", "SAP.XETRA"),
+        ("BRK.B", "XNYS", "BRK-B.US"),
+        ("ATCO A", "XSTO", "ATCO-A.ST"),
+        ("7203", "XTKS", "7203.TSE"),
+        ("X", "XXXX", None),
+    ],
+)
+def test_eodhd_symbol(ticker: str, mic: str, expected: str | None) -> None:
+    assert eodhd_symbol(ticker, mic) == expected
+
+
+def _eodhd_rows(closes: list[float]) -> list[dict[str, float | str]]:
+    return [
+        {
+            "date": f"2026-09-{15 + i:02d}",
+            "open": c,
+            "high": c,
+            "low": c,
+            "close": c,
+            "adjusted_close": c - 1,
+            "volume": 100,
+        }
+        for i, c in enumerate(closes)
+    ]
+
+
+def _budget(limit: int) -> DailyBudget:
+    con = duckdb.connect(":memory:")
+    con.execute("CREATE SCHEMA staging")
+    store = ApiCallStore(con, "staging")
+    return DailyBudget(store, "eodhd", limit, today=lambda: date(2026, 9, 19))
+
+
+def test_eodhd_maps_rows_and_stops_at_the_daily_budget() -> None:
+    seen: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        symbol = request.url.path.rsplit("/", 1)[-1]
+        seen.append(symbol)
+        assert request.url.params["api_token"] == "secret"
+        if symbol == "NOPE.PA":
+            return httpx.Response(404)
+        return httpx.Response(200, json=_eodhd_rows([10.0, 11.0]))
+
+    budget = _budget(limit=2)
+    provider = EodhdProvider(
+        "secret", budget=budget, client=httpx.Client(transport=httpx.MockTransport(handler))
+    )
+    keys = pd.DataFrame(
+        {"ticker": ["SAP", "NOPE", "BMW", "X"], "mic": ["XETR", "XPAR", "XETR", "XXXX"]}
+    )
+
+    out = provider.fetch(keys, date(2026, 9, 15), date(2026, 9, 16))
+
+    assert seen == ["SAP.XETRA", "NOPE.PA"]  # BMW se queda sin cupo; X no tiene bolsa
+    assert budget.used() == 2
+    assert list(out.columns) == list(ALL_FETCH_COLUMNS)
+    assert out["ticker"].tolist() == ["SAP", "SAP"]
+    assert out["mic"].tolist() == ["XETR", "XETR"]
+    assert out["adj_close"].tolist() == [9.0, 10.0]
+    assert out["dividend"].isna().all()
+
+
+def test_eodhd_stops_after_a_plan_rejection() -> None:
+    seen: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request.url.path)
+        return httpx.Response(402, text="upgrade your plan")
+
+    provider = EodhdProvider("secret", client=httpx.Client(transport=httpx.MockTransport(handler)))
+    keys = pd.DataFrame({"ticker": ["SAP", "BMW"], "mic": ["XETR", "XETR"]})
+
+    out = provider.fetch(keys, date(2026, 9, 15), date(2026, 9, 16))
+
+    assert len(seen) == 1
+    assert out.empty
+
+
+def test_registry_builds_eodhd_with_its_budget(cfg_tmp: AppConfig) -> None:
+    with pytest.raises(ValueError, match="cupo"):
+        get_price_provider("eodhd")
+
+    with connect(cfg_tmp) as con, pytest.raises(ValueError, match="EODHD_API_KEY"):
+        get_price_provider("eodhd", cfg=cfg_tmp, con=con)
+
+    with_key = replace(
+        cfg_tmp, env=Env(_env_file=None, ma_data_dir=cfg_tmp.env.ma_data_dir, eodhd_api_key="k")
+    )
+    with connect(with_key) as con:
+        provider = get_price_provider("eodhd", cfg=with_key, con=con)
+    assert isinstance(provider, EodhdProvider)
+    assert provider.budget is not None
+    assert provider.budget.limit == 20

@@ -4,8 +4,10 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from core.config import ConfigError, Env, Rule, load_config
+from core.config.schema import RegionProviders
 
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG_DIR = ROOT / "config"
@@ -110,3 +112,17 @@ def test_universe_files_live_in_per_region_subfolders(empty_env: Env) -> None:
         path = cfg.constituents_path(region)
         assert path.parent == cfg.data_dir / "universe" / region.id
         assert path.name == region.universe.constituents_file.name
+
+
+def test_prices_fallback_must_be_a_different_provider() -> None:
+    with pytest.raises(ValidationError, match="prices_fallback"):
+        RegionProviders(prices="yfinance", prices_fallback="yfinance")
+    assert RegionProviders(prices="yfinance", prices_fallback="eodhd").prices_fallback == "eodhd"
+
+
+def test_fallback_provider_needs_its_credentials(empty_env: Env) -> None:
+    cfg = load_config(CONFIG_DIR, env=empty_env)
+    missing = cfg.missing_env_vars()
+
+    # Europa y APAC rescatan con eodhd, así que su clave cuenta como requerida.
+    assert missing["provider:eodhd"] == ["EODHD_API_KEY"]

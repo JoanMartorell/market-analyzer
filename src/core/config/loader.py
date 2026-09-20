@@ -92,6 +92,7 @@ class AppConfig:
         for region in self.enabled_regions():
             provider_ids = [
                 region.providers.prices,
+                region.providers.prices_fallback,
                 region.providers.fundamentals,
                 region.providers.macro,
             ]
@@ -217,6 +218,7 @@ def _validate_references(
 
         for role, pid in (
             ("prices", region.providers.prices),
+            ("prices", region.providers.prices_fallback),
             ("fundamentals", region.providers.fundamentals),
             ("macro", region.providers.macro),
         ):

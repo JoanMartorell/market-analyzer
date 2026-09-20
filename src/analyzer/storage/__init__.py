@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import duckdb
 
+from analyzer.storage.api_calls import ApiCallStore
 from analyzer.storage.clusters import (
     CLUSTER_COLUMNS,
     MEMBER_COLUMNS,
@@ -69,6 +70,7 @@ __all__ = [
     "SIGNAL_KEY",
     "UNIVERSE_COLUMNS",
     "UNKNOWN_MIC",
+    "ApiCallStore",
     "CorporateActionStore",
     "IndicatorStore",
     "LlmCallStore",

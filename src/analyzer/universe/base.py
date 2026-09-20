@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
+from pathlib import Path
 from typing import Any, Protocol
 
 import httpx
@@ -24,6 +25,7 @@ SOURCE_COLUMNS: tuple[str, ...] = ("ticker", "start", "end")  # mínimo que debe
 class FetchContext:
     today: date
     user_agent: str | None = None  # contacto identificable; la SEC lo exige
+    universe_dir: Path | None = None  # carpeta del universo, por si un enriquecedor guarda memoria
 
 
 class Source(Protocol):

@@ -18,37 +18,9 @@ import pandas as pd
 import structlog
 
 from analyzer.steps.ingest.providers.base import ALL_FETCH_COLUMNS, empty_fetch
-from analyzer.storage import UNKNOWN_MIC
+from analyzer.yahoo import yf_symbol
 
 log = structlog.get_logger(__name__)
-
-# Sufijo de Yahoo por MIC. Cadena vacía = sin sufijo (mercado USA).
-YF_SUFFIX: Mapping[str, str] = {
-    "XNYS": "",
-    "XNAS": "",
-    "BATS": "",
-    UNKNOWN_MIC: "",  # sin bolsa conocida se prueba como símbolo USA
-    "XLON": ".L",
-    "XETR": ".DE",
-    "XPAR": ".PA",
-    "XAMS": ".AS",
-    "XMAD": ".MC",
-    "XMIL": ".MI",
-    "XSWX": ".SW",
-    "XSTO": ".ST",
-    "XOSL": ".OL",
-    "XCSE": ".CO",
-    "XHEL": ".HE",
-    "XBRU": ".BR",
-    "XWBO": ".VI",
-    "XDUB": ".IR",
-    "XLIS": ".LS",
-    "XWAR": ".WA",
-    "XTKS": ".T",
-    "XHKG": ".HK",
-    "XASX": ".AX",
-    "XKRX": ".KS",
-}
 
 _FIELD_MAP = {
     "Open": "open",
@@ -62,15 +34,6 @@ _FIELD_MAP = {
 }
 
 Downloader = Callable[[list[str], date, date], pd.DataFrame]
-
-
-def yf_symbol(ticker: str, mic: str) -> str | None:
-    """``BRK.B``/XNYS -> ``BRK-B``; ``ATCO A``/XSTO -> ``ATCO-A.ST``; bolsa no cubierta -> None."""
-    suffix = YF_SUFFIX.get(mic)
-    if suffix is None:
-        return None
-    base = ticker.strip().upper().replace(" ", "-").replace(".", "-")
-    return f"{base}{suffix}" if base else None
 
 
 def _yf_download(symbols: list[str], start: date, end: date) -> pd.DataFrame:

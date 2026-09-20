@@ -176,11 +176,16 @@ def backfill_prices(cfg: AppConfig, region_id: str, as_of: date, years: int) -> 
     start = as_of - timedelta(days=365 * years)
     table = load_constituents(cfg.constituents_path(region))
     members = members_between(table, start, as_of)
-    provider = get_price_provider(region.providers.prices)
     log.info(
         "backfill.start", region=region_id, keys=len(members), start=str(start), end=str(as_of)
     )
     with connect(cfg) as con:
+        provider = get_price_provider(region.providers.prices, cfg=cfg, con=con)
+        fallback = (
+            get_price_provider(region.providers.prices_fallback, cfg=cfg, con=con)
+            if region.providers.prices_fallback
+            else None
+        )
         store = PriceStore(con, cfg.settings.data.staging_schema)
         return ingest_prices(
             members,
@@ -189,6 +194,7 @@ def backfill_prices(cfg: AppConfig, region_id: str, as_of: date, years: int) -> 
             store=store,
             lookback_days=cfg.settings.indicators.lookback_days,
             start=start,
+            fallback=fallback,
         )
 
 
