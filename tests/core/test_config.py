@@ -1,12 +1,13 @@
 """Tests del cargador de configuración contra los YAML reales del repositorio."""
 
+import shutil
 from dataclasses import replace
 from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
 
-from core.config import ConfigError, Env, Rule, load_config
+from core.config import AppConfig, ConfigError, Env, Rule, load_config
 from core.config.schema import RegionProviders
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -18,7 +19,7 @@ def test_repo_config_loads(empty_env: Env) -> None:
 
     assert cfg.root == ROOT
     assert cfg.settings.base_currency == "EUR"
-    assert set(cfg.regions) == {"americas", "europe", "apac"}
+    assert set(cfg.regions) == {"americas", "europe", "apac", "latam"}
     assert "americas" in [r.id for r in cfg.enabled_regions()]
     assert set(cfg.rules) == {"oversold_uptrend"}
     assert cfg.data_dir == (ROOT / "data").resolve()
@@ -126,3 +127,25 @@ def test_fallback_provider_needs_its_credentials(empty_env: Env) -> None:
 
     # Europa y APAC rescatan con eodhd, así que su clave cuenta como requerida.
     assert missing["provider:eodhd"] == ["EODHD_API_KEY"]
+
+
+def test_two_enabled_regions_cannot_share_a_market(empty_env: Env, tmp_path: Path) -> None:
+    config = tmp_path / "config"
+    shutil.copytree(CONFIG_DIR, config)
+    (config / "regions" / "americas_copy.yaml").write_text(
+        (config / "regions" / "americas.yaml")
+        .read_text(encoding="utf-8")
+        .replace("id: americas", "id: americas_copy"),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ConfigError, match="XNYS ya la cubre la región activa"):
+        load_config(config, env=empty_env)
+
+
+def test_latam_covers_b3_and_bmv(cfg: AppConfig) -> None:
+    latam = cfg.regions["latam"]
+
+    assert {(m.mic, m.currency) for m in latam.markets} == {("BVMF", "BRL"), ("XMEX", "MXN")}
+    assert latam.enabled
+    assert latam.news.strategy == "technical_only"

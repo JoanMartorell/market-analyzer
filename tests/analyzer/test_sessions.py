@@ -63,3 +63,11 @@ def test_next_session_without_a_known_market_takes_the_earliest(cfg: AppConfig) 
 
     assert next_session(americas, date(2026, 9, 18)) == date(2026, 9, 21)
     assert next_session(americas, date(2026, 9, 18), "UNKNOWN") == date(2026, 9, 21)
+
+
+def test_latam_waits_for_mexico_to_close(cfg: AppConfig) -> None:
+    latam = cfg.regions["latam"]
+    # jueves 22:30 Madrid: B3 ya cerró (22:00), la BMV cierra a las 23:00
+    assert last_closed_session(latam, _at(date(2026, 9, 17), 22, 30)) == date(2026, 9, 16)
+    # viernes a las 07:00, la hora del ciclo: la sesión del jueves ya vale
+    assert last_closed_session(latam, _at(date(2026, 9, 18), 7)) == date(2026, 9, 17)

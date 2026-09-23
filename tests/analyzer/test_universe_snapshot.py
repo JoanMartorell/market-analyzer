@@ -3,13 +3,16 @@
 from datetime import date
 
 import pandas as pd
+import pytest
 
 from analyzer.universe import get_universe, members_as_of
 from analyzer.universe.build import roll_snapshot
 from analyzer.universe.sources.europe.stoxx600 import STOXX600
+from analyzer.universe.sources.latam import IBOVESPA, IPC
 from analyzer.universe.sources.wikipedia_table import (
     WikipediaTable,
     code_ticker,
+    exchange_code_ticker,
     parse_wikipedia_table,
 )
 
@@ -56,6 +59,24 @@ NIKKEI = WikipediaTable(
     clean_ticker=code_ticker(4),
     concat_all=True,
 )
+
+
+# Como la lista en portugués: cabeceras en portugués y una fila vacía entre valores.
+IBOV_HTML = """
+<table><tr><th>Código</th><th>Ação</th><th>Setor</th><th>Tipo</th></tr>
+<tr><td></td><td></td><td></td><td></td></tr>
+<tr><td>PETR4</td><td>PETROBRAS</td><td>Petróleo, Gás e Biocombustíveis</td><td>PN N2</td></tr>
+<tr><td></td><td></td><td></td><td></td></tr>
+<tr><td>BMFBOVESPA: VALE3</td><td>VALE</td><td>Materiais Básicos</td><td>ON NM</td></tr>
+</table>
+"""
+
+IPC_HTML = """
+<table><tr><th>Ticker</th><th>Name</th><th>Industry</th></tr>
+<tr><td>BMV: GFNORTE O</td><td>Banorte</td><td>Financials</td></tr>
+<tr><td>PE&amp;OLES</td><td>Peñoles</td><td>Materials</td></tr>
+</table>
+"""
 
 
 def test_code_ticker() -> None:
@@ -144,7 +165,55 @@ def test_members_as_of_keeps_same_ticker_on_different_exchanges() -> None:
     assert (members["ticker"] == "SAN").sum() == 2
 
 
-def test_registry_has_all_three_universes() -> None:
+def test_exchange_code_ticker_glues_the_series_like_yahoo() -> None:
+    assert exchange_code_ticker("BMV: GFNORTE O") == "GFNORTEO"
+    assert exchange_code_ticker("PE&OLES") == "PE&OLES"
+    assert exchange_code_ticker("BMFBOVESPA:\xa0PETR4") == "PETR4"
+    assert exchange_code_ticker(" ") is None
+
+
+def test_ibovespa_table_reads_portuguese_headers_and_skips_blank_rows() -> None:
+    table = parse_wikipedia_table(IBOV_HTML, IBOVESPA)
+
+    assert table["ticker"].tolist() == ["PETR4", "VALE3"]
+    assert set(table["mic"]) == {"BVMF"} and set(table["currency"]) == {"BRL"}
+    assert table["sector"].tolist() == ["Petróleo, Gás e Biocombustíveis", "Materiais Básicos"]
+
+
+def test_rowspan_survives_the_empty_rows_wikipedia_inserts() -> None:
+    # Dos series de la misma empresa: nombre y sector con rowspan=2, y entre
+    # ambas filas el <tr> vacío que mete el editor visual de Wikipedia.
+    html = """
+    <table><tr><th>Código</th><th>Ação</th><th>Setor</th><th>Tipo</th></tr>
+    <tr><td>ELET3</td><td rowspan="2">ELETROBRAS</td><td rowspan="2">Energia</td><td>ON</td></tr>
+    <tr class="mw-empty-elt"></tr>
+    <tr><td>ELET6</td><td>PNB</td></tr>
+    </table>
+    """
+
+    table = parse_wikipedia_table(html, IBOVESPA)
+
+    assert table["ticker"].tolist() == ["ELET3", "ELET6"]
+    assert table["name"].tolist() == ["ELETROBRAS", "ELETROBRAS"]
+    assert table["sector"].tolist() == ["Energia", "Energia"]
+
+
+def test_ipc_table_maps_to_bmv() -> None:
+    table = parse_wikipedia_table(IPC_HTML, IPC)
+
+    assert table["ticker"].tolist() == ["GFNORTEO", "PE&OLES"]
+    assert set(table["mic"]) == {"XMEX"} and set(table["currency"]) == {"MXN"}
+
+
+def test_missing_columns_error_lists_the_headers_found() -> None:
+    html = "<table><tr><th>Empresa</th><th>Peso</th></tr><tr><td>A</td><td>1</td></tr></table>"
+
+    with pytest.raises(ValueError, match=r"cabeceras encontradas: \['Empresa', 'Peso'\]"):
+        parse_wikipedia_table(html, IBOVESPA)
+
+
+def test_registry_has_all_universes() -> None:
     assert get_universe("sp500").history is True
     assert get_universe("stoxx600").history is False
     assert get_universe("apac_large_cap").history is False
+    assert get_universe("latam_large_cap").history is False

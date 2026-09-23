@@ -270,6 +270,11 @@ def cfg_tmp(cfg: AppConfig, tmp_path: Path) -> AppConfig:
     return replace(cfg, env=Env(_env_file=None, ma_data_dir=tmp_path))
 
 
+def _recent(article: Article) -> Article:
+    """El paso mide la ventana desde el reloj real, no desde ``NOW``."""
+    return replace(article, published_at=datetime.now(UTC) - timedelta(hours=1))
+
+
 def _ctx(cfg_tmp: AppConfig, candidates: pd.DataFrame) -> StepContext:
     ctx = StepContext(cfg=cfg_tmp, region=cfg_tmp.regions["americas"], as_of=AS_OF)
     ctx.data["candidates"] = candidates
@@ -299,7 +304,7 @@ def test_step_fails_when_no_source_can_be_built(
 def test_step_reports_source_without_key_and_continues(
     cfg_tmp: AppConfig, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    source = FakeSource("fake", [_article("AAPL", 1, source="fake")])
+    source = FakeSource("fake", [_recent(_article("AAPL", 1, source="fake"))])
 
     def build(sid: str, config: object, env: object) -> object:
         if sid == "finnhub":
@@ -316,7 +321,7 @@ def test_step_reports_source_without_key_and_continues(
 def test_step_downloads_for_candidates_and_positions(
     cfg_tmp: AppConfig, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    source = FakeSource("fake", [_article("AAPL", 1, source="fake")])
+    source = FakeSource("fake", [_recent(_article("AAPL", 1, source="fake"))])
     monkeypatch.setattr("analyzer.steps.news.step.build_source", lambda sid, c, e: source)
     ctx = _ctx(cfg_tmp, _targets("AAPL"))
     ctx.data["open_positions"] = _targets("NVDA")

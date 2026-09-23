@@ -131,13 +131,15 @@ tests/               espejo de src; conftest con cfg real sin credenciales
   entero.
 - Valores marcados `PROVISIONAL` en los YAML son ajustes de prueba con su valor de
   producción al lado; no se dejan olvidados.
-- Universos de instantánea (Europa, APAC): reconstruirlos borra y rehace la composición;
+- Universos de instantánea (Europa, APAC, Latinoamérica): reconstruirlos borra y rehace la composición;
   la memoria de tickers `yahoo_symbols.json` de cada carpeta se conserva y puede
   corregirse a mano.
 
 ## Estado y límites conocidos
 
-- Américas es la región de referencia. Europa y APAC están activas; Europa depende de
+- Américas es la región de referencia. Europa, APAC y Latinoamérica (B3 + BMV, solo
+  reglas técnicas) están activas; dos regiones activas no pueden compartir bolsa porque
+  la clave de señal no lleva región. Europa depende de
   que Yahoo publique a tiempo (EODHD gratuito solo rescata 20 valores/día).
 - `reevaluation_gate` (Europa) existe en el esquema pero ningún paso lo ejecuta.
 - FMP y FRED están declarados pero sin uso.

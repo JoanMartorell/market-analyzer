@@ -2,7 +2,9 @@
 
 Orden: settings.yaml -> sources.yaml -> regions/*.yaml -> rules/*.yaml.
 Después se comprueba que cada región apunte a proveedores, fuentes, reglas y
-calendarios que existen. Un fallo en cualquier punto lanza ``ConfigError``
+calendarios que existen, y que dos regiones activas no compartan bolsa: la
+clave de una señal es (ticker, mic, fecha, regla), sin región, y una pisaría
+las señales de la otra. Un fallo en cualquier punto lanza ``ConfigError``
 con la ruta del fichero: nunca se arranca con una configuración a medias.
 """
 
@@ -243,6 +245,18 @@ def _validate_references(
         for cal in sorted(region.calendars):
             if cal not in known_calendars:
                 problems.append(f"{prefix}: calendario {cal!r} no existe en exchange_calendars")
+
+    owners: dict[str, str] = {}
+    for region in regions.values():
+        if not region.enabled:
+            continue
+        for market in region.markets:
+            owner = owners.setdefault(market.mic, region.id)
+            if owner != region.id:
+                problems.append(
+                    f"región {region.id!r}: la bolsa {market.mic} ya la cubre la región "
+                    f"activa {owner!r}; desactiva una de las dos"
+                )
 
     if problems:
         raise ConfigError("referencias inválidas:\n  - " + "\n  - ".join(problems))

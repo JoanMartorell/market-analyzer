@@ -37,6 +37,8 @@ YF_SUFFIX: Mapping[str, str] = {
     "XHKG": ".HK",
     "XASX": ".AX",
     "XKRX": ".KS",
+    "BVMF": ".SA",
+    "XMEX": ".MX",
 }
 
 

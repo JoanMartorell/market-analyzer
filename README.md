@@ -92,12 +92,16 @@ siguiente sesión de su bolsa.
 | americas | NYSE, Nasdaq | S&P 500 con histórico desde 1996 | 06:30 | yfinance |
 | europe | 16 bolsas (Xetra, Euronext, LSE, SIX, nórdicas...) | STOXX 600 | 19:30 | yfinance + rescate EODHD |
 | apac | Tokio, Hong Kong, Sídney, Seúl | Nikkei 225 + HSI + ASX 200 + KOSPI 200 | 10:30 | yfinance + rescate EODHD |
+| latam | B3 (São Paulo), Bolsa Mexicana | Ibovespa + S&P/BMV IPC | 07:00 | yfinance + rescate EODHD |
 
-Los universos de Europa y APAC son instantáneas de Wikipedia que se reconstruyen a
+Los universos de Europa, APAC y Latinoamérica son instantáneas de Wikipedia que se reconstruyen a
 diario y acumulan su histórico desde el primer build. Las tablas traen códigos Reuters
 y empresas ya absorbidas, así que un enriquecedor corrige cada ticker contra Yahoo y
 saca de la composición a las que ya no cotizan. Las resoluciones quedan en
 `data/universe/<región>/yahoo_symbols.json`, editable a mano.
+
+Dos regiones activas no pueden compartir bolsa: la clave de una señal es (ticker, mic,
+fecha, regla), sin región, y una pisaría las señales de la otra. El cargador lo rechaza.
 
 Límites conocidos:
 

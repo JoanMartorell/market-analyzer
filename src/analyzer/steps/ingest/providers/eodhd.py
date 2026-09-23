@@ -58,6 +58,8 @@ EODHD_EXCHANGE: Mapping[str, str] = {
     "XHKG": "HK",
     "XASX": "AU",
     "XKRX": "KO",
+    "BVMF": "SA",
+    "XMEX": "MX",
 }
 
 _FIELDS = {
