@@ -1,10 +1,7 @@
-# Ciclo Américas sobre el S&P 500 point-in-time.
-# Desactivada: la sustituye quantfury_us (lo negociable en el bróker). No activar las
-# dos a la vez: la clave de señal (ticker, mic, fecha, regla) no lleva región y una
-# pisaría las señales de la otra. El histórico desde 1996 sigue sirviendo para backfill.
+# Ciclo Américas. Es el único activo hasta que lleve un mes reconciliando limpio.
 id: americas
 name: Américas
-enabled: false
+enabled: true
 
 markets:
   - mic: XNYS

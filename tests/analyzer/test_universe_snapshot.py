@@ -3,13 +3,16 @@
 from datetime import date
 
 import pandas as pd
+import pytest
 
 from analyzer.universe import get_universe, members_as_of
 from analyzer.universe.build import roll_snapshot
 from analyzer.universe.sources.europe.stoxx600 import STOXX600
+from analyzer.universe.sources.latam import IBOVESPA, IPC
 from analyzer.universe.sources.wikipedia_table import (
     WikipediaTable,
     code_ticker,
+    exchange_code_ticker,
     parse_wikipedia_table,
 )
 
@@ -56,6 +59,21 @@ NIKKEI = WikipediaTable(
     clean_ticker=code_ticker(4),
     concat_all=True,
 )
+
+
+IBOV_HTML = """
+<table><tr><th>Symbol</th><th>Company</th><th>Sector</th></tr>
+<tr><td>PETR4</td><td>Petrobras</td><td>Energy</td></tr>
+<tr><td>BMFBOVESPA: VALE3</td><td>Vale</td><td>Materials</td></tr>
+</table>
+"""
+
+IPC_HTML = """
+<table><tr><th>Ticker</th><th>Name</th><th>Industry</th></tr>
+<tr><td>BMV: GFNORTE O</td><td>Banorte</td><td>Financials</td></tr>
+<tr><td>PE&amp;OLES</td><td>Peñoles</td><td>Materials</td></tr>
+</table>
+"""
 
 
 def test_code_ticker() -> None:
@@ -144,7 +162,37 @@ def test_members_as_of_keeps_same_ticker_on_different_exchanges() -> None:
     assert (members["ticker"] == "SAN").sum() == 2
 
 
-def test_registry_has_all_three_universes() -> None:
+def test_exchange_code_ticker_glues_the_series_like_yahoo() -> None:
+    assert exchange_code_ticker("BMV: GFNORTE O") == "GFNORTEO"
+    assert exchange_code_ticker("PE&OLES") == "PE&OLES"
+    assert exchange_code_ticker("BMFBOVESPA:\xa0PETR4") == "PETR4"
+    assert exchange_code_ticker(" ") is None
+
+
+def test_ibovespa_table_accepts_alternative_headers() -> None:
+    table = parse_wikipedia_table(IBOV_HTML, IBOVESPA)
+
+    assert table["ticker"].tolist() == ["PETR4", "VALE3"]
+    assert set(table["mic"]) == {"BVMF"} and set(table["currency"]) == {"BRL"}
+    assert table["sector"].tolist() == ["Energy", "Materials"]
+
+
+def test_ipc_table_maps_to_bmv() -> None:
+    table = parse_wikipedia_table(IPC_HTML, IPC)
+
+    assert table["ticker"].tolist() == ["GFNORTEO", "PE&OLES"]
+    assert set(table["mic"]) == {"XMEX"} and set(table["currency"]) == {"MXN"}
+
+
+def test_missing_columns_error_lists_the_headers_found() -> None:
+    html = "<table><tr><th>Empresa</th><th>Peso</th></tr><tr><td>A</td><td>1</td></tr></table>"
+
+    with pytest.raises(ValueError, match=r"cabeceras encontradas: \['Empresa', 'Peso'\]"):
+        parse_wikipedia_table(html, IBOVESPA)
+
+
+def test_registry_has_all_universes() -> None:
     assert get_universe("sp500").history is True
     assert get_universe("stoxx600").history is False
     assert get_universe("apac_large_cap").history is False
+    assert get_universe("latam_large_cap").history is False

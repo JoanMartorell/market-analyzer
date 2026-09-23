@@ -62,7 +62,7 @@ def test_the_cycle_reconciles_the_session_and_reports_both(
     reconcile = FakeStep("reconcile", "11 señales del 2026-09-17: 11 conciliadas")
     outbox, dispatcher = _wire(monkeypatch, daily, reconcile)
 
-    result = app.run_region(cfg_tmp, "quantfury_us", DAY, dispatcher=dispatcher)
+    result = app.run_region(cfg_tmp, "americas", DAY, dispatcher=dispatcher)
 
     assert result.ok
     assert [r.name for r in result.reports] == ["persist", "reconcile"]
@@ -78,7 +78,7 @@ def test_a_cycle_that_stops_early_does_not_reconcile(
     reconcile = FakeStep("reconcile")
     _, dispatcher = _wire(monkeypatch, daily, reconcile)
 
-    result = app.run_region(cfg_tmp, "quantfury_us", DAY, dispatcher=dispatcher)
+    result = app.run_region(cfg_tmp, "americas", DAY, dispatcher=dispatcher)
 
     assert result.stopped_early
     assert [r.name for r in result.reports] == ["calendar_gate"]
@@ -92,7 +92,7 @@ def test_a_failed_cycle_does_not_reconcile(
     reconcile = FakeStep("reconcile")
     outbox, dispatcher = _wire(monkeypatch, daily, reconcile)
 
-    result = app.run_region(cfg_tmp, "quantfury_us", DAY, dispatcher=dispatcher)
+    result = app.run_region(cfg_tmp, "americas", DAY, dispatcher=dispatcher)
 
     assert not result.ok
     assert reconcile.seen == []
@@ -106,7 +106,7 @@ def test_a_failed_reconciliation_fails_the_cycle(
     reconcile = FakeStep("reconcile", "sin precios en prod", fail=True)
     outbox, dispatcher = _wire(monkeypatch, daily, reconcile)
 
-    result = app.run_region(cfg_tmp, "quantfury_us", DAY, dispatcher=dispatcher)
+    result = app.run_region(cfg_tmp, "americas", DAY, dispatcher=dispatcher)
 
     assert result.failed_step == "reconcile"
     assert outbox.messages[0].severity == "error"
@@ -119,7 +119,7 @@ def test_reconcile_region_runs_only_step_twelve(
     reconcile = FakeStep("reconcile", "sin señales pendientes")
     _wire(monkeypatch, daily, reconcile)
 
-    result = app.reconcile_region(cfg_tmp, "quantfury_us", DAY)
+    result = app.reconcile_region(cfg_tmp, "americas", DAY)
 
     assert [r.name for r in result.reports] == ["reconcile"]
     assert daily.seen == []
@@ -157,10 +157,10 @@ def test_a_good_cycle_delivers_the_digest_not_the_step_table(
     reconcile = FakeStep("reconcile", "sin señales pendientes de conciliar a 2026-09-18")
     outbox, dispatcher = _wire(monkeypatch, daily, reconcile)
 
-    app.run_region(cfg_tmp, "quantfury_us", DAY, dispatcher=dispatcher)
+    app.run_region(cfg_tmp, "americas", DAY, dispatcher=dispatcher)
 
     message = outbox.messages[0]
-    assert message.subject == "[quantfury_us] 2026-09-18: 1 candidato sin veredicto"
+    assert message.subject == "[americas] 2026-09-18: 1 candidato sin veredicto"
     assert "• AAA · 10.00 USD · score 0.80 · rsi_14 < 35" in message.body
     assert "Ayer: sin señales pendientes de conciliar a 2026-09-18" in message.body
     assert "persist" not in message.body  # la tabla de pasos se queda en el log

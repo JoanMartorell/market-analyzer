@@ -19,15 +19,8 @@ def test_repo_config_loads(empty_env: Env) -> None:
 
     assert cfg.root == ROOT
     assert cfg.settings.base_currency == "EUR"
-    assert set(cfg.regions) == {
-        "americas",
-        "europe",
-        "apac",
-        "quantfury_us",
-        "quantfury_latam",
-        "quantfury_europe",
-    }
-    assert "quantfury_us" in [r.id for r in cfg.enabled_regions()]
+    assert set(cfg.regions) == {"americas", "europe", "apac", "latam"}
+    assert "americas" in [r.id for r in cfg.enabled_regions()]
     assert set(cfg.rules) == {"oversold_uptrend"}
     assert cfg.data_dir == (ROOT / "data").resolve()
 
@@ -139,9 +132,10 @@ def test_fallback_provider_needs_its_credentials(empty_env: Env) -> None:
 def test_two_enabled_regions_cannot_share_a_market(empty_env: Env, tmp_path: Path) -> None:
     config = tmp_path / "config"
     shutil.copytree(CONFIG_DIR, config)
-    americas = config / "regions" / "americas.yaml"
-    americas.write_text(
-        americas.read_text(encoding="utf-8").replace("enabled: false", "enabled: true"),
+    (config / "regions" / "americas_copy.yaml").write_text(
+        (config / "regions" / "americas.yaml")
+        .read_text(encoding="utf-8")
+        .replace("id: americas", "id: americas_copy"),
         encoding="utf-8",
     )
 
@@ -149,12 +143,9 @@ def test_two_enabled_regions_cannot_share_a_market(empty_env: Env, tmp_path: Pat
         load_config(config, env=empty_env)
 
 
-def test_quantfury_regions_cover_the_broker_exchanges(cfg: AppConfig) -> None:
-    mics = {rid: {m.mic for m in cfg.regions[rid].markets} for rid in cfg.regions}
+def test_latam_covers_b3_and_bmv(cfg: AppConfig) -> None:
+    latam = cfg.regions["latam"]
 
-    assert mics["quantfury_us"] == {"XNYS", "XNAS"}
-    assert mics["quantfury_latam"] == {"BVMF", "XMEX"}
-    assert {m.currency for m in cfg.regions["quantfury_europe"].markets} == {"EUR"}
-    for rid in ("quantfury_us", "quantfury_latam", "quantfury_europe"):
-        assert cfg.regions[rid].enabled
-        assert cfg.regions[rid].universe.id == rid
+    assert {(m.mic, m.currency) for m in latam.markets} == {("BVMF", "BRL"), ("XMEX", "MXN")}
+    assert latam.enabled
+    assert latam.news.strategy == "technical_only"

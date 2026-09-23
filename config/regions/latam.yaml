@@ -1,8 +1,8 @@
-# Ciclo Latinoamérica sobre el catálogo de Quantfury: B3 (Brasil) y BMV (México).
-# Región propia y no parte de EE. UU.: las fuentes de noticias por ticker buscan el
-# símbolo como si fuera estadounidense ("AC", "Q", "GCC" son otras empresas allí).
-id: quantfury_latam
-name: Latinoamérica (Quantfury)
+# Ciclo Latinoamérica: B3 (Brasil) y Bolsa Mexicana.
+# Región propia y no parte de Américas: cierran más tarde que Wall Street y las fuentes
+# de noticias por ticker buscan el símbolo como si fuera estadounidense.
+id: latam
+name: Latinoamérica
 enabled: true
 
 markets:
@@ -15,9 +15,9 @@ schedule:
   reevaluation_gate: null
 
 universe:
-  id: quantfury_latam
-  constituents_file: quantfury_latam_pit.parquet  # en data/universe/quantfury_latam/
-  min_avg_volume_20: 100_000       # universo pequeño (106) y ya filtrado por el bróker
+  id: latam_large_cap
+  constituents_file: latam_large_cap_pit.parquet  # en data/universe/latam/
+  min_avg_volume_20: 500_000
 
 providers:
   prices: yfinance                 # .SA y .MX en Yahoo
