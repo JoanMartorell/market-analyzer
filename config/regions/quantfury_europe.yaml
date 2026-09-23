@@ -1,0 +1,43 @@
+# Ciclo Europa sobre el catálogo de Quantfury: acciones europeas que el bróker negocia
+# en Cboe Europe, en EUR. exchange_calendars no tiene calendario de Cboe Europe, así que
+# cada valor va en su bolsa de origen, que es donde hay velas diarias y festivos reales.
+# Sustituye a "europe" (STOXX 600), que queda desactivada por la misma razón que "americas".
+id: quantfury_europe
+name: Europa (Quantfury)
+enabled: true
+
+markets:
+  - { mic: XETR, calendar: XETR, currency: EUR }   # Xetra
+  - { mic: XPAR, calendar: XPAR, currency: EUR }   # Euronext París
+  - { mic: XAMS, calendar: XAMS, currency: EUR }   # Euronext Ámsterdam
+  - { mic: XMAD, calendar: XMAD, currency: EUR }   # BME
+  - { mic: XMIL, calendar: XMIL, currency: EUR }   # Borsa Italiana
+  - { mic: XBRU, calendar: XBRU, currency: EUR }   # Euronext Bruselas
+  - { mic: XHEL, calendar: XHEL, currency: EUR }   # Helsinki
+  - { mic: XWBO, calendar: XWBO, currency: EUR }   # Viena
+  - { mic: XDUB, calendar: XDUB, currency: EUR }   # Euronext Dublín
+  - { mic: XLIS, calendar: XLIS, currency: EUR }   # Euronext Lisboa
+
+schedule:
+  run_at: "19:30"                  # tras el cierre europeo (17:30; Helsinki, 17:30 peninsular)
+  execute_at: next_open
+  reevaluation_gate: null          # la puerta de "europe" no la ejecuta ningún paso todavía
+
+universe:
+  id: quantfury_europe
+  constituents_file: quantfury_europe_pit.parquet # en data/universe/quantfury_europe/
+  min_avg_volume_20: 100_000       # en acciones; con 500k se perderían Adyen, Rational, Hapag-Lloyd...
+
+providers:
+  prices: yfinance                 # gratis y por lotes; en Europa a veces llega con días de retraso
+  prices_fallback: eodhd           # rescata lo que Yahoo deje sin la vela del día (cupo diario)
+  fundamentals: null
+  macro: null
+  news: [finnhub]
+
+news:
+  language: en
+  strategy: native                 # la prensa financiera europea relevante está en inglés
+
+rules:
+  - oversold_uptrend

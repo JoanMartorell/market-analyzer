@@ -1,12 +1,13 @@
 """Tests del cargador de configuración contra los YAML reales del repositorio."""
 
+import shutil
 from dataclasses import replace
 from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
 
-from core.config import ConfigError, Env, Rule, load_config
+from core.config import AppConfig, ConfigError, Env, Rule, load_config
 from core.config.schema import RegionProviders
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -18,8 +19,15 @@ def test_repo_config_loads(empty_env: Env) -> None:
 
     assert cfg.root == ROOT
     assert cfg.settings.base_currency == "EUR"
-    assert set(cfg.regions) == {"americas", "europe", "apac"}
-    assert "americas" in [r.id for r in cfg.enabled_regions()]
+    assert set(cfg.regions) == {
+        "americas",
+        "europe",
+        "apac",
+        "quantfury_us",
+        "quantfury_latam",
+        "quantfury_europe",
+    }
+    assert "quantfury_us" in [r.id for r in cfg.enabled_regions()]
     assert set(cfg.rules) == {"oversold_uptrend"}
     assert cfg.data_dir == (ROOT / "data").resolve()
 
@@ -126,3 +134,27 @@ def test_fallback_provider_needs_its_credentials(empty_env: Env) -> None:
 
     # Europa y APAC rescatan con eodhd, así que su clave cuenta como requerida.
     assert missing["provider:eodhd"] == ["EODHD_API_KEY"]
+
+
+def test_two_enabled_regions_cannot_share_a_market(empty_env: Env, tmp_path: Path) -> None:
+    config = tmp_path / "config"
+    shutil.copytree(CONFIG_DIR, config)
+    americas = config / "regions" / "americas.yaml"
+    americas.write_text(
+        americas.read_text(encoding="utf-8").replace("enabled: false", "enabled: true"),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ConfigError, match="XNYS ya la cubre la región activa"):
+        load_config(config, env=empty_env)
+
+
+def test_quantfury_regions_cover_the_broker_exchanges(cfg: AppConfig) -> None:
+    mics = {rid: {m.mic for m in cfg.regions[rid].markets} for rid in cfg.regions}
+
+    assert mics["quantfury_us"] == {"XNYS", "XNAS"}
+    assert mics["quantfury_latam"] == {"BVMF", "XMEX"}
+    assert {m.currency for m in cfg.regions["quantfury_europe"].markets} == {"EUR"}
+    for rid in ("quantfury_us", "quantfury_latam", "quantfury_europe"):
+        assert cfg.regions[rid].enabled
+        assert cfg.regions[rid].universe.id == rid

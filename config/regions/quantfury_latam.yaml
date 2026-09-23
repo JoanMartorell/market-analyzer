@@ -1,0 +1,34 @@
+# Ciclo Latinoamérica sobre el catálogo de Quantfury: B3 (Brasil) y BMV (México).
+# Región propia y no parte de EE. UU.: las fuentes de noticias por ticker buscan el
+# símbolo como si fuera estadounidense ("AC", "Q", "GCC" son otras empresas allí).
+id: quantfury_latam
+name: Latinoamérica (Quantfury)
+enabled: true
+
+markets:
+  - { mic: BVMF, calendar: BVMF, currency: BRL }   # B3, São Paulo
+  - { mic: XMEX, calendar: XMEX, currency: MXN }   # Bolsa Mexicana de Valores
+
+schedule:
+  run_at: "07:00"                  # B3 cierra a las 22:00-23:00 y la BMV a las 23:00 (hora peninsular)
+  execute_at: next_open
+  reevaluation_gate: null
+
+universe:
+  id: quantfury_latam
+  constituents_file: quantfury_latam_pit.parquet  # en data/universe/quantfury_latam/
+  min_avg_volume_20: 100_000       # universo pequeño (106) y ya filtrado por el bróker
+
+providers:
+  prices: yfinance                 # .SA y .MX en Yahoo
+  prices_fallback: eodhd           # rescata lo que Yahoo deje sin la vela del día (cupo diario compartido)
+  fundamentals: null
+  macro: null
+  news: []
+
+news:
+  language: multi
+  strategy: technical_only         # prensa en portugués y castellano; sin traducción, solo reglas técnicas
+
+rules:
+  - oversold_uptrend

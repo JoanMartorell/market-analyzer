@@ -36,6 +36,9 @@ PROVIDER_TARGET = "analyzer.steps.ingest.step.get_price_provider"
         ("ATCO A", "XSTO", "ATCO-A.ST"),
         ("0005", "XHKG", "0005.HK"),
         ("7203", "XTKS", "7203.T"),
+        ("PETR4", "BVMF", "PETR4.SA"),
+        ("WALMEX", "XMEX", "WALMEX.MX"),
+        ("NDA.FI", "XHEL", "NDA-FI.HE"),
         ("X", "XXXX", None),
     ],
 )
@@ -318,6 +321,8 @@ def test_fallback_only_asks_for_markets_with_a_session(memory_store: PriceStore)
         ("BRK.B", "XNYS", "BRK-B.US"),
         ("ATCO A", "XSTO", "ATCO-A.ST"),
         ("7203", "XTKS", "7203.TSE"),
+        ("VALE3", "BVMF", "VALE3.SA"),
+        ("GFNORTEO", "XMEX", "GFNORTEO.MX"),
         ("X", "XXXX", None),
     ],
 )

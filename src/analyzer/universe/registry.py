@@ -5,12 +5,16 @@ from __future__ import annotations
 from analyzer.universe.base import UniverseSpec
 from analyzer.universe.sources.apac import APAC
 from analyzer.universe.sources.europe import EUROPE
+from analyzer.universe.sources.quantfury import QUANTFURY_EUROPE, QUANTFURY_LATAM, QUANTFURY_US
 from analyzer.universe.sources.sp500 import SP500
 
 UNIVERSES: dict[str, UniverseSpec] = {
     SP500.id: SP500,
     EUROPE.id: EUROPE,
     APAC.id: APAC,
+    QUANTFURY_US.id: QUANTFURY_US,
+    QUANTFURY_LATAM.id: QUANTFURY_LATAM,
+    QUANTFURY_EUROPE.id: QUANTFURY_EUROPE,
 }
 
 

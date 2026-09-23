@@ -96,10 +96,11 @@ def config_check(config_dir: ConfigDirOption = None) -> None:
     typer.echo(f"entrega: {', '.join(cfg.settings.delivery.channels)}")
     typer.echo("")
 
+    width = max(len(rid) for rid in cfg.regions)
     for region in cfg.regions.values():
         state = "ON " if region.enabled else "off"
         rules = ", ".join(region.rules)
-        typer.echo(f"[{state}] {region.id:10} {region.schedule.run_at:%H:%M}  reglas: {rules}")
+        typer.echo(f"[{state}] {region.id:{width}} {region.schedule.run_at:%H:%M}  reglas: {rules}")
 
     typer.echo("")
     for rule in cfg.rules.values():

@@ -1,9 +1,11 @@
 # Ciclo Europa.
 # El incómodo: cierre 17:30, ejecución 09:00 del día siguiente, con toda la sesión
 # americana entremedias. Por eso lleva gate de reevaluación.
+# Desactivada: la sustituye quantfury_europe. No activar las dos a la vez (misma razón
+# que en americas.yaml: comparten valores y la clave de señal no lleva región).
 id: europe
 name: Europa
-enabled: true
+enabled: false
 
 markets:
   - { mic: XETR, calendar: XETR, currency: EUR }   # Xetra

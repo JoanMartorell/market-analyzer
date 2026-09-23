@@ -89,12 +89,24 @@ siguiente sesión de su bolsa.
 
 | Región | Mercados | Universo | Hora (Madrid) | Precios |
 |---|---|---|---|---|
-| americas | NYSE, Nasdaq | S&P 500 con histórico desde 1996 | 06:30 | yfinance |
-| europe | 16 bolsas (Xetra, Euronext, LSE, SIX, nórdicas...) | STOXX 600 | 19:30 | yfinance + rescate EODHD |
+| quantfury_us | NYSE, Nasdaq | Catálogo Quantfury: 1.036 + 593 acciones y ETF | 06:30 | yfinance |
+| quantfury_latam | B3, BMV | Catálogo Quantfury: 76 + 30 | 07:00 | yfinance + rescate EODHD |
+| quantfury_europe | 10 bolsas en EUR (Xetra, Euronext, BME, Milán...) | Catálogo Quantfury: 298 de Cboe Europe | 19:30 | yfinance + rescate EODHD |
 | apac | Tokio, Hong Kong, Sídney, Seúl | Nikkei 225 + HSI + ASX 200 + KOSPI 200 | 10:30 | yfinance + rescate EODHD |
+| americas (off) | NYSE, Nasdaq | S&P 500 con histórico desde 1996 | 06:30 | yfinance |
+| europe (off) | 16 bolsas (Xetra, Euronext, LSE, SIX, nórdicas...) | STOXX 600 | 19:30 | yfinance + rescate EODHD |
 
-Los universos de Europa y APAC son instantáneas de Wikipedia que se reconstruyen a
-diario y acumulan su histórico desde el primer build. Las tablas traen códigos Reuters
+Las regiones `quantfury_*` analizan lo que se puede negociar en el bróker. Su catálogo
+es una foto versionada en `src/analyzer/universe/sources/quantfury/instruments.csv`
+(bolsa y símbolo del bróker, ticker y MIC con precios); actualizarlo es editar ese
+fichero. Las acciones de Cboe Europe van en su bolsa de origen: Cboe no tiene
+calendario en exchange_calendars y las velas diarias salen de la cotización principal.
+`americas` y `europe` quedan desactivadas porque cubren las mismas bolsas: el cargador
+rechaza dos regiones activas con una bolsa en común, ya que la clave de una señal no
+lleva región y una pisaría las señales de la otra.
+
+Los universos de Europa y APAC son instantáneas de Wikipedia, y los de Quantfury del CSV:
+se reconstruyen a diario y acumulan su histórico desde el primer build. Las tablas traen códigos Reuters
 y empresas ya absorbidas, así que un enriquecedor corrige cada ticker contra Yahoo y
 saca de la composición a las que ya no cotizan. Las resoluciones quedan en
 `data/universe/<región>/yahoo_symbols.json`, editable a mano.
