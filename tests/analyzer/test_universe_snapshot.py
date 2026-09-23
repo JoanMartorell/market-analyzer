@@ -61,10 +61,13 @@ NIKKEI = WikipediaTable(
 )
 
 
+# Como la lista en portugués: cabeceras en portugués y una fila vacía entre valores.
 IBOV_HTML = """
-<table><tr><th>Symbol</th><th>Company</th><th>Sector</th></tr>
-<tr><td>PETR4</td><td>Petrobras</td><td>Energy</td></tr>
-<tr><td>BMFBOVESPA: VALE3</td><td>Vale</td><td>Materials</td></tr>
+<table><tr><th>Código</th><th>Ação</th><th>Setor</th><th>Tipo</th></tr>
+<tr><td></td><td></td><td></td><td></td></tr>
+<tr><td>PETR4</td><td>PETROBRAS</td><td>Petróleo, Gás e Biocombustíveis</td><td>PN N2</td></tr>
+<tr><td></td><td></td><td></td><td></td></tr>
+<tr><td>BMFBOVESPA: VALE3</td><td>VALE</td><td>Materiais Básicos</td><td>ON NM</td></tr>
 </table>
 """
 
@@ -169,12 +172,30 @@ def test_exchange_code_ticker_glues_the_series_like_yahoo() -> None:
     assert exchange_code_ticker(" ") is None
 
 
-def test_ibovespa_table_accepts_alternative_headers() -> None:
+def test_ibovespa_table_reads_portuguese_headers_and_skips_blank_rows() -> None:
     table = parse_wikipedia_table(IBOV_HTML, IBOVESPA)
 
     assert table["ticker"].tolist() == ["PETR4", "VALE3"]
     assert set(table["mic"]) == {"BVMF"} and set(table["currency"]) == {"BRL"}
-    assert table["sector"].tolist() == ["Energy", "Materials"]
+    assert table["sector"].tolist() == ["Petróleo, Gás e Biocombustíveis", "Materiais Básicos"]
+
+
+def test_rowspan_survives_the_empty_rows_wikipedia_inserts() -> None:
+    # Dos series de la misma empresa: nombre y sector con rowspan=2, y entre
+    # ambas filas el <tr> vacío que mete el editor visual de Wikipedia.
+    html = """
+    <table><tr><th>Código</th><th>Ação</th><th>Setor</th><th>Tipo</th></tr>
+    <tr><td>ELET3</td><td rowspan="2">ELETROBRAS</td><td rowspan="2">Energia</td><td>ON</td></tr>
+    <tr class="mw-empty-elt"></tr>
+    <tr><td>ELET6</td><td>PNB</td></tr>
+    </table>
+    """
+
+    table = parse_wikipedia_table(html, IBOVESPA)
+
+    assert table["ticker"].tolist() == ["ELET3", "ELET6"]
+    assert table["name"].tolist() == ["ELETROBRAS", "ELETROBRAS"]
+    assert table["sector"].tolist() == ["Energia", "Energia"]
 
 
 def test_ipc_table_maps_to_bmv() -> None:

@@ -68,7 +68,7 @@ class WikipediaSnapshot:
 
 def parse_wikipedia_table(html: str, spec: WikipediaTable) -> pd.DataFrame:
     """HTML -> DataFrame[ticker, name, sector, mic, currency, index_id]."""
-    tables = pd.read_html(io.StringIO(html))
+    tables = pd.read_html(io.StringIO(_drop_empty_rows(html)))
     matches = [t for t in tables if _pick(t, spec.ticker_column) and _pick(t, spec.name_column)]
     if not matches:
         found = sorted({str(c) for t in tables for c in t.columns})
@@ -102,6 +102,20 @@ def parse_wikipedia_table(html: str, spec: WikipediaTable) -> pd.DataFrame:
         out["currency"] = spec.currency
     out["index_id"] = spec.index_id
     return out.dropna(subset=["ticker"]).drop_duplicates(["ticker", "mic"]).reset_index(drop=True)
+
+
+_EMPTY_ROW = re.compile(r"<tr\b[^>]*>\s*</tr>", re.IGNORECASE)
+
+
+def _drop_empty_rows(html: str) -> str:
+    """Quita las filas sin celdas que Wikipedia intercala (``<tr class="mw-empty-elt">``).
+
+    pandas cuenta esas filas al repartir un ``rowspan``: una celda que abarca
+    dos valores cae en la fila vacía y el segundo valor hereda columnas
+    desplazadas (el tipo de acción pasa por nombre de empresa). Sin ellas el
+    ``rowspan`` cae donde debe.
+    """
+    return _EMPTY_ROW.sub("", html)
 
 
 def _pick(table: pd.DataFrame, wanted: Columns | None) -> str | None:
