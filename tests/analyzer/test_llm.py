@@ -6,6 +6,8 @@ from dataclasses import dataclass, field, replace
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
+import anthropic
+import httpx2
 import pandas as pd
 import pytest
 from anthropic.types import ErrorResponse, InvalidRequestError, Message, TextBlock, Usage
@@ -176,6 +178,7 @@ class FakeBatches:
         self._result = result
         self.created: list[Any] = []
         self.cancelled: list[str] = []
+        self.cancel_error: Exception | None = None
 
     def create(self, *, requests: Sequence[Any]) -> _Batch:
         self.created.extend(requests)
@@ -187,6 +190,8 @@ class FakeBatches:
 
     def cancel(self, batch_id: str) -> _Batch:
         self.cancelled.append(batch_id)
+        if self.cancel_error is not None:
+            raise self.cancel_error
         return _Batch(id=batch_id, processing_status="canceling")
 
     def results(self, batch_id: str) -> Iterator[_Result]:
@@ -616,6 +621,44 @@ def test_a_slow_batch_is_cancelled_and_repeated_live(settings: LLMSettings) -> N
     assert fake.messages.batches.cancelled == ["batch_1"]
     assert reply.batch is False
     assert len(fake.messages.calls) == 1
+
+
+def _cannot_cancel() -> anthropic.BadRequestError:
+    request = httpx2.Request("POST", "https://api.anthropic.com/v1/messages/batches/batch_1/cancel")
+    body = {
+        "type": "error",
+        "error": {
+            "type": "invalid_request_error",
+            "message": "Batch batch_1 cannot be canceled: it has already finished processing.",
+        },
+    }
+    return anthropic.BadRequestError(
+        "Error code: 400", response=httpx2.Response(400, request=request), body=body
+    )
+
+
+def test_a_batch_that_ends_while_cancelling_is_used(settings: LLMSettings) -> None:
+    """Si el lote termina entre la última consulta y la cancelación, valen sus resultados."""
+    fake = FakeAnthropic(_message(_answer("AAA")), statuses=["in_progress"] * 6 + ["ended"])
+    fake.messages.batches.cancel_error = _cannot_cancel()
+    patient = settings.model_copy(update={"batch_wait_minutes": 1})
+    client = AnthropicClient(fake, patient, sleep=lambda _: None)  # type: ignore[arg-type]
+
+    reply = client.ask(PROMPT, "{}")
+
+    assert fake.messages.batches.cancelled == ["batch_1"]
+    assert reply.batch is True
+    assert fake.messages.calls == []
+
+
+def test_a_refused_cancel_on_a_running_batch_is_an_error(settings: LLMSettings) -> None:
+    fake = FakeAnthropic(_message(_answer("AAA")), statuses=["in_progress"] * 50)
+    fake.messages.batches.cancel_error = _cannot_cancel()
+    patient = settings.model_copy(update={"batch_wait_minutes": 1})
+    client = AnthropicClient(fake, patient, sleep=lambda _: None)  # type: ignore[arg-type]
+
+    with pytest.raises(LlmError, match="la API respondió con error"):
+        client.ask(PROMPT, "{}")
 
 
 def test_a_failed_batch_says_why(settings: LLMSettings) -> None:
