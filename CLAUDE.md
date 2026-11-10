@@ -149,8 +149,9 @@ tests/               espejo de src; conftest con cfg real sin credenciales
 
 ## Estado y límites conocidos
 
-- Américas es la región de referencia. Europa, APAC y Latinoamérica (B3 + BMV, solo
-  reglas técnicas) están activas; dos regiones activas no pueden compartir bolsa porque
+- Américas es la región de referencia. Europa y Latinoamérica (B3 + BMV, solo
+  reglas técnicas) están activas; APAC está desactivada (`enabled: false`) con su
+  configuración intacta. Dos regiones activas no pueden compartir bolsa porque
   la clave de señal no lleva región. Europa depende de
   que Yahoo publique a tiempo (EODHD gratuito solo rescata 20 valores/día).
 - Patrones chartistas: ocho figuras (doble suelo/techo, HCH y HCH invertido, triángulo

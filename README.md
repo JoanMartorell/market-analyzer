@@ -120,7 +120,7 @@ histórico calculado con dos criterios.
 |---|---|---|---|---|
 | americas | NYSE, Nasdaq | S&P 500 con histórico desde 1996 | 06:30 | yfinance |
 | europe | 16 bolsas (Xetra, Euronext, LSE, SIX, nórdicas...) | STOXX 600 | 19:30 | yfinance + rescate EODHD |
-| apac | Tokio, Hong Kong, Sídney, Seúl | Nikkei 225 + HSI + ASX 200 + KOSPI 200 | 10:30 | yfinance + rescate EODHD |
+| apac (desactivada) | Tokio, Hong Kong, Sídney, Seúl | Nikkei 225 + HSI + ASX 200 + KOSPI 200 | 10:30 | yfinance + rescate EODHD |
 | latam | B3 (São Paulo), Bolsa Mexicana | Ibovespa + S&P/BMV IPC | 07:00 | yfinance + rescate EODHD |
 
 Los universos de Europa, APAC y Latinoamérica son instantáneas de Wikipedia que se reconstruyen a

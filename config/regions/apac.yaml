@@ -3,7 +3,7 @@
 # de comida en Tokio. exchange_calendars lo cubre; nunca usar weekday() < 5.
 id: apac
 name: Asia-Pacífico
-enabled: true
+enabled: false                     # desactivada el 2026-11-10; la configuración se conserva para reactivarla
 
 markets:
   - { mic: XTKS, calendar: XTKS, currency: JPY }   # Tokio
