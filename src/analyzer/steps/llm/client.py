@@ -140,11 +140,30 @@ class AnthropicClient:
             if status == ENDED:
                 return
             self._sleep(POLL_SECONDS)
-        self._client.messages.batches.cancel(batch_id)
+        if self._cancel(batch_id):
+            return
         raise TimeoutError(
             f"el lote {batch_id} sigue en {status} tras "
             f"{self._settings.batch_wait_minutes} min: se cancela y se llama en directo"
         )
+
+    def _cancel(self, batch_id: str) -> bool:
+        """Cancela el lote; devuelve ``True`` si resulta que ya había terminado.
+
+        Entre la última consulta y la cancelación el lote puede terminar, y la
+        API rechaza cancelar un lote terminado con un 400. En ese caso se
+        vuelve a consultar: si está terminado, sus resultados valen y no hace
+        falta la llamada directa. Cualquier otro rechazo sigue siendo un error.
+        """
+        try:
+            self._client.messages.batches.cancel(batch_id)
+        except anthropic.BadRequestError:
+            status = self._client.messages.batches.retrieve(batch_id).processing_status
+            if status != ENDED:
+                raise
+            log.info("llm.batch_ended_on_cancel", batch=batch_id)
+            return True
+        return False
 
     def _collect(self, batch_id: str) -> Reply:
         for result in self._client.messages.batches.results(batch_id):
