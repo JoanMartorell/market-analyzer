@@ -34,7 +34,9 @@ def test_repo_config_loads(empty_env: Env) -> None:
         "bear_flag",
     }
     # La regla de indicadores convive con las de patrones en todas las regiones.
-    assert all(len(region.rules) == 9 for region in cfg.regions.values())
+    # bear_flag tiene regla pero ninguna región la usa: su histórico no la respalda.
+    assert all(len(region.rules) == 8 for region in cfg.regions.values())
+    assert all("bear_flag" not in region.rules for region in cfg.regions.values())
     # Cada patrón del catálogo tiene su regla, con la dirección que le corresponde.
     for spec in PATTERNS:
         assert cfg.rules[spec.name].output.direction == spec.direction

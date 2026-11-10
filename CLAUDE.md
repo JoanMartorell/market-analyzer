@@ -156,7 +156,9 @@ tests/               espejo de src; conftest con cfg real sin credenciales
   que Yahoo publique a tiempo (EODHD gratuito solo rescata 20 valores/día).
 - Patrones chartistas: ocho figuras (doble suelo/techo, HCH y HCH invertido, triángulo
   ascendente/descendente, bandera alcista/bajista) conviven con `oversold_uptrend` en
-  todas las regiones. Cuñas, triples y triángulos simétricos no están. Si dos figuras
+  todas las regiones, salvo `bear_flag`: tiene regla y columna pero ninguna región la
+  usa (22% de acierto en un año de Américas); se reactiva añadiéndola a `rules:`.
+  Cuñas, triples y triángulos simétricos no están. Si dos figuras
   rompen el mismo día en un valor, la columna es de la primera de `PATTERNS`. Los umbrales (`PatternParams`) van en código, no en YAML. Las columnas
   `pat_*` solo se rellenan en filas nuevas: los días anteriores a su alta quedan a NULL
   salvo recálculo. `analyzer patterns stats -r <región>` mide frecuencia y desenlace

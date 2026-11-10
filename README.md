@@ -92,7 +92,10 @@ Además de la regla de indicadores (`oversold_uptrend`), cada región evalúa oc
 | | COMPRAR | VENDER EN CORTO |
 |---|---|---|
 | Giro | doble suelo, hombro-cabeza-hombro invertido | doble techo, hombro-cabeza-hombro |
-| Continuación | triángulo ascendente, bandera alcista | triángulo descendente, bandera bajista |
+| Continuación | triángulo ascendente, bandera alcista | triángulo descendente, bandera bajista (\*) |
+
+(\*) La bandera bajista se detecta y se mide, pero ninguna región la usa como regla: en
+el histórico disponible solo el 22 % llegó al objetivo.
 
 - El detector (`src/analyzer/patterns/`) saca los pivotes del precio con un zigzag en
   ATR y da la figura por completada el día en que el cierre rompe su línea. Lo que se
