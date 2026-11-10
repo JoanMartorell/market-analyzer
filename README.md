@@ -95,7 +95,7 @@ Además de la regla de indicadores (`oversold_uptrend`), cada región evalúa oc
 | Continuación | triángulo ascendente, bandera alcista | triángulo descendente, bandera bajista (\*) |
 
 (\*) La bandera bajista se detecta y se mide, pero ninguna región la usa como regla: en
-el histórico disponible solo el 22 % llegó al objetivo.
+cinco años de Américas solo el 24 % llegó al objetivo, y perdió de media todos los años.
 
 - El detector (`src/analyzer/patterns/`) saca los pivotes del precio con un zigzag en
   ATR y da la figura por completada el día en que el cierre rompe su línea. Lo que se
@@ -111,7 +111,9 @@ el histórico disponible solo el 22 % llegó al objetivo.
   (`delivery.notify_operations`).
 - `analyzer patterns stats -r americas` pasa el detector por el histórico guardado y
   cuenta cuántos patrones llegaron al objetivo antes que al stop. No descarga nada ni
-  llama al modelo; es una medida de frecuencia y desenlace, no un backtest.
+  llama al modelo; es una medida de frecuencia y desenlace, no un backtest. Con
+  `--years 5` (tras `analyzer ingest backfill -r americas --years 5`) recorre ese tramo
+  de staging y desglosa por año, para ver si una figura aguanta en mercados distintos.
 
 Los umbrales del detector están en `PatternParams` (`patterns/model.py`), en código y no
 en YAML: las columnas se guardan día a día y un umbral cambiado a mano dejaría un

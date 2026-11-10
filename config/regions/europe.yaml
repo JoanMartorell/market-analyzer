@@ -56,5 +56,6 @@ rules:
   - double_top                     # patrones chartistas: corto
   - head_shoulders
   - descending_triangle
-  # bear_flag: sin activar. En el histórico de Américas (un año, 170 casos) solo el 22%
-  # llegó al objetivo. La regla y el detector siguen; `analyzer patterns stats` la mide.
+  # bear_flag: sin activar. En cinco años de Américas (909 casos) solo el 24% llegó al
+  # objetivo y perdió de media todos los años, 2022 incluido. La regla y el detector
+  # siguen; `analyzer patterns stats` la mide.

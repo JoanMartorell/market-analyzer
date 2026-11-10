@@ -259,22 +259,37 @@ def backfill_prices(cfg: AppConfig, region_id: str, as_of: date, years: int) -> 
 
 
 def pattern_stats(
-    cfg: AppConfig, region_id: str, as_of: date, horizon: int = DEFAULT_HORIZON
+    cfg: AppConfig,
+    region_id: str,
+    as_of: date,
+    horizon: int = DEFAULT_HORIZON,
+    years: int | None = None,
 ) -> PatternStats:
-    """Patrones que el detector encuentra en el histórico de prod y cómo acabó cada uno.
+    """Patrones que el detector encuentra en el histórico guardado y cómo acabó cada uno.
 
-    Recorre las velas guardadas de los valores vigentes en la región a
-    ``as_of``; no descarga nada ni llama al modelo. Mide frecuencia y
-    desenlace, no es un backtest: usa los miembros de hoy (los que salieron
-    del índice no están) y no descuenta costes.
+    No descarga nada ni llama al modelo. Mide frecuencia y desenlace, no es
+    un backtest: no descuenta costes.
+
+    Sin ``years`` recorre prod (lo que pasó ``quality``, unas 250 sesiones)
+    para los valores vigentes a ``as_of``. Con ``years`` recorre ese tramo
+    de staging, que es donde deja las velas ``ingest backfill``, para todo
+    valor que estuvo en el índice en el rango. Staging no ha pasado ningún
+    control: sirve para comparar patrones entre años, no para fiarse de un
+    hallazgo suelto.
     """
     region = _region(cfg, region_id)
-    members = members_as_of(load_constituents(cfg.constituents_path(region)), as_of)
+    table = load_constituents(cfg.constituents_path(region))
+    data = cfg.settings.data
+    if years is None:
+        schema, start = data.prod_schema, None
+        members = members_as_of(table, as_of)
+    else:
+        schema, start = data.staging_schema, as_of - timedelta(days=365 * years)
+        members = members_between(table, start, as_of)
     with connect(cfg) as con:
-        store = PriceStore(con, cfg.settings.data.prod_schema)
-        prices = store.load(end=as_of, keys=universe_keys(members))
+        prices = PriceStore(con, schema).load(start=start, end=as_of, keys=universe_keys(members))
     if prices.empty:
-        raise ValueError(f"no hay velas en prod para {region_id!r} hasta {as_of}")
+        raise ValueError(f"no hay velas en {schema} para {region_id!r} hasta {as_of}")
     return evaluate_prices(prices, horizon=horizon)
 
 

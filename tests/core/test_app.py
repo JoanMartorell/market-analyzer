@@ -249,16 +249,16 @@ def test_pattern_stats_follow_the_patterns_of_the_current_universe(cfg_tmp: AppC
     region = cfg_tmp.regions["americas"]
     members = pd.DataFrame(
         {
-            "ticker": ["AAA"],
-            "name": ["Alpha"],
-            "sector": ["IT"],
-            "sub_industry": [None],
-            "cik": pd.array([None], dtype="Int64"),
-            "mic": ["XNYS"],
-            "currency": ["USD"],
-            "start": pd.to_datetime(pd.Series(["2000-01-03"])),
-            "end": pd.to_datetime(pd.Series([None])),
-            "source": ["test"],
+            "ticker": ["AAA", "GONE"],  # GONE salió del índice en junio
+            "name": ["Alpha", "Gone"],
+            "sector": ["IT", "IT"],
+            "sub_industry": [None, None],
+            "cik": pd.array([None, None], dtype="Int64"),
+            "mic": ["XNYS", "XNYS"],
+            "currency": ["USD", "USD"],
+            "start": pd.to_datetime(pd.Series(["2000-01-03", "2000-01-03"])),
+            "end": pd.to_datetime(pd.Series([None, "2026-06-01"])),
+            "source": ["test", "test"],
         }
     )
     write_constituents(members, cfg_tmp.constituents_path(region), meta={})
@@ -278,6 +278,22 @@ def test_pattern_stats_follow_the_patterns_of_the_current_universe(cfg_tmp: AppC
     assert stats.keys == 1
     assert stats.events["ticker"].tolist() == ["AAA"]
     assert stats.summary() == "1 patrón en 1 valores: doble suelo 1"
+
+    # Con años se lee staging (donde deja las velas el backfill) y cuentan también
+    # los valores que estuvieron en el índice durante el rango.
+    with pytest.raises(ValueError, match="no hay velas en staging"):
+        app.pattern_stats(cfg_tmp, "americas", later, years=1)
+    gone = _double_bottom_bars("GONE")
+    with connect(cfg_tmp) as con:
+        staging = PriceStore(con, cfg_tmp.settings.data.staging_schema)
+        staging.upsert(pd.concat([gone, gone.iloc[[-1]].assign(date=pd.Timestamp(later))]))
+
+    history = app.pattern_stats(cfg_tmp, "americas", later, horizon=10, years=1)
+
+    assert history.events["ticker"].tolist() == ["GONE"]
+    assert history.yearly()[["año", "patron", "hallazgos"]].to_numpy().tolist() == [
+        [2026, "doble suelo", 1]
+    ]
 
 
 def test_telegram_chats_needs_the_token(cfg_tmp: AppConfig) -> None:

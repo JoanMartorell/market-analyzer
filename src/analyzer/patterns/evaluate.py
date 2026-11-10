@@ -54,26 +54,23 @@ class PatternStats:
 
     def table(self) -> pd.DataFrame:
         """Una fila por patrón: cuántos, cómo acabaron y qué rindieron de media."""
-        rows = []
-        for spec in PATTERNS:
-            found = self.events.loc[self.events["pattern"] == spec.name]
-            traded = found.loc[found["outcome"] != VOID]
-            closed = int(traded["outcome"].isin([TARGET, STOP]).sum())
-            hits = int((traded["outcome"] == TARGET).sum())
-            rows.append(
-                {
-                    "patron": spec.label,
-                    "direccion": spec.direction,
-                    "hallazgos": len(found),
-                    "objetivo": hits,
-                    "stop": int((traded["outcome"] == STOP).sum()),
-                    "abiertas": int((traded["outcome"] == OPEN).sum()),
-                    "anuladas": len(found) - len(traded),
-                    "acierto": hits / closed if closed else float("nan"),
-                    "retorno_medio": float(traded["ret"].mean()) if len(traded) else float("nan"),
-                }
-            )
-        return pd.DataFrame(rows)
+        return _table(self.events)
+
+    def yearly(self) -> pd.DataFrame:
+        """La misma tabla por año de la ruptura, con la columna ``año`` delante.
+
+        Un patrón puede ir bien en un mercado y mal en otro; el total de
+        varios años lo esconde. Solo salen los patrones con hallazgos ese año.
+        """
+        if self.events.empty:
+            return _table(self.events).iloc[:0].assign(año=pd.Series(dtype="int64"))
+        years = pd.to_datetime(self.events["date"]).dt.year
+        parts = []
+        for year in sorted(years.unique()):
+            rows = _table(self.events.loc[years == year])
+            parts.append(rows.loc[rows["hallazgos"] > 0].assign(año=int(year)))
+        out = pd.concat(parts, ignore_index=True)
+        return out.loc[:, ["año", *[c for c in out.columns if c != "año"]]]
 
     def summary(self) -> str:
         if self.events.empty:
@@ -88,6 +85,29 @@ class PatternStats:
             parts.append(text)
         noun = "patrón" if len(self.events) == 1 else "patrones"
         return f"{len(self.events)} {noun} en {self.keys} valores: {', '.join(parts)}"
+
+
+def _table(events: pd.DataFrame) -> pd.DataFrame:
+    rows = []
+    for spec in PATTERNS:
+        found = events.loc[events["pattern"] == spec.name]
+        traded = found.loc[found["outcome"] != VOID]
+        closed = int(traded["outcome"].isin([TARGET, STOP]).sum())
+        hits = int((traded["outcome"] == TARGET).sum())
+        rows.append(
+            {
+                "patron": spec.label,
+                "direccion": spec.direction,
+                "hallazgos": len(found),
+                "objetivo": hits,
+                "stop": int((traded["outcome"] == STOP).sum()),
+                "abiertas": int((traded["outcome"] == OPEN).sum()),
+                "anuladas": len(found) - len(traded),
+                "acierto": hits / closed if closed else float("nan"),
+                "retorno_medio": float(traded["ret"].mean()) if len(traded) else float("nan"),
+            }
+        )
+    return pd.DataFrame(rows)
 
 
 def evaluate_prices(

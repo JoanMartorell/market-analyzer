@@ -157,12 +157,15 @@ tests/               espejo de src; conftest con cfg real sin credenciales
 - Patrones chartistas: ocho figuras (doble suelo/techo, HCH y HCH invertido, triángulo
   ascendente/descendente, bandera alcista/bajista) conviven con `oversold_uptrend` en
   todas las regiones, salvo `bear_flag`: tiene regla y columna pero ninguna región la
-  usa (22% de acierto en un año de Américas); se reactiva añadiéndola a `rules:`.
+  usa (24% de acierto en cinco años de Américas, negativa todos los años); se reactiva
+  añadiéndola a `rules:`.
   Cuñas, triples y triángulos simétricos no están. Si dos figuras
   rompen el mismo día en un valor, la columna es de la primera de `PATTERNS`. Los umbrales (`PatternParams`) van en código, no en YAML. Las columnas
   `pat_*` solo se rellenan en filas nuevas: los días anteriores a su alta quedan a NULL
   salvo recálculo. `analyzer patterns stats -r <región>` mide frecuencia y desenlace
-  sobre prod sin gastar cupo.
+  sobre prod sin gastar cupo; con `--years N` lee staging (lo que deja `ingest
+  backfill`, sin control de calidad) y desglosa por año. Prod solo guarda la ventana de
+  250 sesiones: un histórico largo vive en staging.
 - Las señales llevan `pattern`, `stop_price` y `target_price` (nulos sin patrón), pero
   nadie sigue todavía si la operación tocó stop u objetivo: `reconcile` solo mide el gap
   de apertura.

@@ -358,5 +358,20 @@ def test_stats_summarise_each_pattern_across_the_universe() -> None:
     row = stats.table().iloc[0]
     assert (row["hallazgos"], row["objetivo"], row["stop"]) == (2, 1, 1)
     assert evaluate_prices(flat).summary() == "sin patrones en 1 valores"
+    assert evaluate_prices(flat).yearly().empty
     with pytest.raises(ValueError, match="horizonte"):
         evaluate_prices(flat, horizon=0)
+
+
+def test_yearly_stats_split_the_events_by_the_year_of_the_breakout() -> None:
+    hit = _bars([*DOUBLE_BOTTOM, (80, 130)]).assign(ticker="NEW", mic="XNAS")
+    stopped = _bars([*DOUBLE_BOTTOM, (90, 90)]).assign(ticker="OLD", mic="XNAS")
+    stopped["date"] = stopped["date"] - pd.DateOffset(years=1)
+
+    yearly = evaluate_prices(pd.concat([hit, stopped], ignore_index=True)).yearly()
+
+    # El total diría 50% de acierto; por años, uno fue todo stop y el otro todo objetivo.
+    assert yearly[["año", "patron", "objetivo", "stop"]].to_numpy().tolist() == [
+        [2025, "doble suelo", 0, 1],
+        [2026, "doble suelo", 1, 0],
+    ]

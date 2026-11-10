@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
 
@@ -292,29 +292,53 @@ def patterns_stats(
         int,
         typer.Option("--horizon", "-n", help="Sesiones que se sigue cada operación.", min=1),
     ] = 40,
+    years: Annotated[
+        int | None,
+        typer.Option(
+            "--years",
+            "-y",
+            help="Años de histórico de staging (tras `ingest backfill`), desglosados por año.",
+            min=1,
+        ),
+    ] = None,
     config_dir: ConfigDirOption = None,
 ) -> None:
-    """Pasa el detector por el histórico de prod: cuántos patrones y cuántos al objetivo.
+    """Pasa el detector por el histórico guardado: cuántos patrones y cuántos al objetivo.
 
     No descarga precios ni llama al modelo. Entra en la apertura siguiente a
-    la ruptura y sale en el primer nivel que toque el precio.
+    la ruptura y sale en el primer nivel que toque el precio. Sin --years lee
+    prod (unas 250 sesiones); con --years, ese tramo de staging, sin control
+    de calidad, y añade el desglose por año.
     """
     try:
         cfg = bootstrap(config_dir)
         day = as_of.date() if as_of else default_session(cfg, region)
-        stats = pattern_stats(cfg, region, day, horizon)
+        stats = pattern_stats(cfg, region, day, horizon, years)
     except (ConfigError, FileNotFoundError, ValueError) as exc:
         raise _fail(str(exc), 1) from None
 
-    typer.echo(f"universo:  {region} a {day}, {stats.keys} valores con velas en prod")
+    source = "prod" if years is None else f"staging, {years} años"
+    typer.echo(f"universo:  {region} a {day}, {stats.keys} valores con velas ({source})")
     typer.echo(f"horizonte: {stats.horizon} sesiones desde la apertura siguiente a la ruptura")
     typer.echo("")
+    _echo_pattern_rows(stats.table().to_dict("records"))
+    if years is not None:
+        yearly = stats.yearly()
+        for year in sorted(yearly["año"].unique()):
+            typer.echo("")
+            typer.echo(f"--- {year} ---")
+            _echo_pattern_rows(yearly.loc[yearly["año"] == year].to_dict("records"))
+    typer.echo("")
+    typer.echo("acierto = objetivo / (objetivo + stop); retorno medio bruto, sin costes.")
+
+
+def _echo_pattern_rows(rows: list[dict[Any, Any]]) -> None:
     header = (
         f"{'patrón':32} {'dir':5} {'n':>5} {'objetivo':>8} {'stop':>5} "
         f"{'abiertas':>8} {'anuladas':>8} {'acierto':>8} {'retorno':>8}"
     )
     typer.echo(header)
-    for row in stats.table().to_dict("records"):
+    for row in rows:
         hit = "-" if row["acierto"] != row["acierto"] else f"{row['acierto']:.0%}"
         mean = (
             "-" if row["retorno_medio"] != row["retorno_medio"] else f"{row['retorno_medio']:+.1%}"
@@ -324,8 +348,6 @@ def patterns_stats(
             f"{row['patron']:32} {side:5} {row['hallazgos']:>5} {row['objetivo']:>8} "
             f"{row['stop']:>5} {row['abiertas']:>8} {row['anuladas']:>8} {hit:>8} {mean:>8}"
         )
-    typer.echo("")
-    typer.echo("acierto = objetivo / (objetivo + stop); retorno medio bruto, sin costes.")
 
 
 @telegram_app.command("chats")
