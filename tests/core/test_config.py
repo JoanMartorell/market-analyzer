@@ -33,10 +33,13 @@ def test_repo_config_loads(empty_env: Env) -> None:
         "bull_flag",
         "bear_flag",
     }
-    # La regla de indicadores convive con las de patrones en todas las regiones.
-    # bear_flag tiene regla pero ninguna región la usa: su histórico no la respalda.
-    assert all(len(region.rules) == 8 for region in cfg.regions.values())
-    assert all("bear_flag" not in region.rules for region in cfg.regions.values())
+    # La regla de indicadores convive en todas las regiones con los patrones de compra.
+    # Los de corto tienen regla pero ninguna región los usa: su histórico no los respalda.
+    for region in cfg.regions.values():
+        assert region.rules[0] == "oversold_uptrend"
+        directions = {cfg.rules[rule_id].output.direction for rule_id in region.rules}
+        assert directions == {"long"}
+        assert len(region.rules) == 5
     # Cada patrón del catálogo tiene su regla, con la dirección que le corresponde.
     for spec in PATTERNS:
         assert cfg.rules[spec.name].output.direction == spec.direction

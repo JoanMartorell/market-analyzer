@@ -156,9 +156,10 @@ tests/               espejo de src; conftest con cfg real sin credenciales
   que Yahoo publique a tiempo (EODHD gratuito solo rescata 20 valores/día).
 - Patrones chartistas: ocho figuras (doble suelo/techo, HCH y HCH invertido, triángulo
   ascendente/descendente, bandera alcista/bajista) conviven con `oversold_uptrend` en
-  todas las regiones, salvo `bear_flag`: tiene regla y columna pero ninguna región la
-  usa (24% de acierto en cinco años de Américas, negativa todos los años); se reactiva
-  añadiéndola a `rules:`.
+  todas las regiones, pero solo las cuatro de compra. Las de corto (`double_top`,
+  `head_shoulders`, `descending_triangle`, `bear_flag`) tienen regla y columna y ninguna
+  región las usa: en cinco años de Américas perdieron de media, también en 2022. Se
+  reactivan añadiéndolas a `rules:`; hoy el sistema solo emite señales de compra.
   Cuñas, triples y triángulos simétricos no están. Si dos figuras
   rompen el mismo día en un valor, la columna es de la primera de `PATTERNS`. Los umbrales (`PatternParams`) van en código, no en YAML. Las columnas
   `pat_*` solo se rellenan en filas nuevas: los días anteriores a su alta quedan a NULL

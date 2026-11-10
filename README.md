@@ -92,10 +92,12 @@ Además de la regla de indicadores (`oversold_uptrend`), cada región evalúa oc
 | | COMPRAR | VENDER EN CORTO |
 |---|---|---|
 | Giro | doble suelo, hombro-cabeza-hombro invertido | doble techo, hombro-cabeza-hombro |
-| Continuación | triángulo ascendente, bandera alcista | triángulo descendente, bandera bajista (\*) |
+| Continuación | triángulo ascendente, bandera alcista | triángulo descendente, bandera bajista |
 
-(\*) La bandera bajista se detecta y se mide, pero ninguna región la usa como regla: en
-cinco años de Américas solo el 24 % llegó al objetivo, y perdió de media todos los años.
+Las cuatro figuras de corto se detectan y se miden, pero hoy ninguna región las usa como
+regla: en cinco años de Américas las cuatro perdieron de media (entre -0,7 % y -2,9 %
+por operación), también en 2022. El sistema solo emite señales de compra hasta que se
+reactiven en `rules:` de la región.
 
 - El detector (`src/analyzer/patterns/`) saca los pivotes del precio con un zigzag en
   ATR y da la figura por completada el día en que el cierre rompe su línea. Lo que se
