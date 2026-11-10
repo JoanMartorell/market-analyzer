@@ -68,8 +68,8 @@ src/analyzer/
   steps/<paso>/      step.py (adaptador al motor) + service.py (lógica pura, testeable)
   storage/           una clase Table por tabla DuckDB, DDL + migraciones en COLUMNS_ADDED
   rules/             parser AST + funciones permitidas
-  patterns/          patrones chartistas: pivots (zigzag en ATR), reversal (figuras),
-                     detect (recorrido causal -> columnas pat_*), evaluate (desenlace)
+  patterns/          patrones chartistas: pivots (zigzag en ATR), reversal y continuation
+                     (figuras), detect (recorrido causal -> columnas pat_*), evaluate
   universe/          constituyentes point-in-time: fuentes, enriquecedores, build
   sessions.py        qué sesión procesar (as_of nunca es "hoy")
   yahoo.py           sufijos de Yahoo por MIC (compartido por proveedor y universo)
@@ -100,7 +100,8 @@ tests/               espejo de src; conftest con cfg real sin credenciales
 - **Un patrón chartista**: función en `patterns/` que recibe los últimos pivotes
   normalizados (`Point`) y devuelve la figura armada (`Shape`: línea de ruptura, altura,
   stop), escrita solo en alcista; su `PatternSpec` en `model.py` (`PATTERNS`) y su
-  entrada en `_DETECTORS` de `detect.py` con signo +1 y, para la versión bajista, -1. La
+  entrada en `_DETECTORS` de `detect.py` con signo +1 y, para la versión bajista, -1
+  (una figura que no sale de pivotes, como la bandera, va en `_FLAGS` y mira velas). La
   columna `pat_<nombre>` aparece sola. Después, la regla YAML con `window: 1` y su alta
   en las regiones. Nada de lo que se decide en la vela `t` puede mirar más allá de `t`:
   el test de prefijos de `tests/analyzer/test_patterns.py` lo vigila.
@@ -152,9 +153,10 @@ tests/               espejo de src; conftest con cfg real sin credenciales
   reglas técnicas) están activas; dos regiones activas no pueden compartir bolsa porque
   la clave de señal no lleva región. Europa depende de
   que Yahoo publique a tiempo (EODHD gratuito solo rescata 20 valores/día).
-- Patrones chartistas: cuatro figuras de giro (doble suelo/techo, HCH y HCH invertido)
-  conviven con `oversold_uptrend` en todas las regiones. Triángulos y banderas están
-  pendientes. Los umbrales (`PatternParams`) van en código, no en YAML. Las columnas
+- Patrones chartistas: ocho figuras (doble suelo/techo, HCH y HCH invertido, triángulo
+  ascendente/descendente, bandera alcista/bajista) conviven con `oversold_uptrend` en
+  todas las regiones. Cuñas, triples y triángulos simétricos no están. Si dos figuras
+  rompen el mismo día en un valor, la columna es de la primera de `PATTERNS`. Los umbrales (`PatternParams`) van en código, no en YAML. Las columnas
   `pat_*` solo se rellenan en filas nuevas: los días anteriores a su alta quedan a NULL
   salvo recálculo. `analyzer patterns stats -r <región>` mide frecuencia y desenlace
   sobre prod sin gastar cupo.

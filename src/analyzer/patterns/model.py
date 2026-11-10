@@ -38,11 +38,21 @@ DOUBLE_TOP = PatternSpec("double_top", "short", "doble techo")
 INV_HEAD_SHOULDERS = PatternSpec("inv_head_shoulders", "long", "hombro-cabeza-hombro invertido")
 HEAD_SHOULDERS = PatternSpec("head_shoulders", "short", "hombro-cabeza-hombro")
 
+ASCENDING_TRIANGLE = PatternSpec("ascending_triangle", "long", "triángulo ascendente")
+DESCENDING_TRIANGLE = PatternSpec("descending_triangle", "short", "triángulo descendente")
+BULL_FLAG = PatternSpec("bull_flag", "long", "bandera alcista")
+BEAR_FLAG = PatternSpec("bear_flag", "short", "bandera bajista")
+
+# El orden decide qué figura se queda el día si dos rompen a la vez: primero las de giro.
 PATTERNS: tuple[PatternSpec, ...] = (
     DOUBLE_BOTTOM,
     DOUBLE_TOP,
     INV_HEAD_SHOULDERS,
     HEAD_SHOULDERS,
+    ASCENDING_TRIANGLE,
+    DESCENDING_TRIANGLE,
+    BULL_FLAG,
+    BEAR_FLAG,
 )
 PATTERNS_BY_NAME: dict[str, PatternSpec] = {p.name: p for p in PATTERNS}
 
@@ -67,6 +77,12 @@ class PatternParams:
     max_neckline_tilt: float = 0.5  # desnivel máximo de la línea clavicular, en alturas
     max_shoulder_time_ratio: float = 3.0  # asimetría temporal máxima entre los dos lados
     stop_buffer_atr: float = 0.25  # holgura del stop más allá de la figura
+    # Banderas: se miran en las velas, no en los pivotes.
+    pole_min_atr: float = 6.0  # subida mínima del mástil
+    pole_max_bars: int = 15  # sesiones máximas en las que el mástil hace esa subida
+    flag_min_bars: int = 4  # sesiones mínimas de pausa entre el máximo del mástil y la ruptura
+    flag_max_bars: int = 20
+    flag_max_retrace: float = 0.5  # parte del mástil que la pausa puede devolver
 
 
 DEFAULT_PARAMS = PatternParams()

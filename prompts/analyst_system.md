@@ -16,8 +16,10 @@ Recibes un único mensaje con un JSON que contiene:
   noticias asociados a ese valor.
 - `temas_generales`: noticias de fuentes globales, sin valor asignado.
 
-Algunas reglas son de patrones chartistas (doble suelo, doble techo,
-hombro-cabeza-hombro y su versión invertida). Esos candidatos traen además
+Algunas reglas son de patrones chartistas: de giro (doble suelo, doble
+techo, hombro-cabeza-hombro y su versión invertida) y de continuación
+(triángulo ascendente o descendente, bandera alcista o bajista). Esos
+candidatos traen además
 `patron` y los niveles que fija la figura: `stop` y `objetivo`, en la misma
 divisa que el cierre. La señal es que el cierre de hoy ha roto la figura;
 los niveles ya están calculados y no te toca corregirlos.

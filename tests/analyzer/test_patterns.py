@@ -10,6 +10,8 @@ from analyzer.patterns import (
     DEFAULT_PARAMS,
     PATTERN_COLUMNS,
     PATTERN_WARMUP,
+    PATTERNS,
+    PatternMatch,
     ZigZag,
     average_true_range,
     find_patterns,
@@ -20,6 +22,7 @@ from analyzer.patterns.evaluate import OPEN, STOP, TARGET, VOID, evaluate_key, e
 from analyzer.patterns.pivots import Array
 
 END = date(2026, 9, 17)
+FLAGS = [p.column for p in PATTERNS]  # las columnas 0/1, una por patrón
 Waypoints = list[tuple[int, float]]
 
 # Caída desde 130, suelo en 100, rebote a 110, segundo suelo en 100 y ruptura de 110.
@@ -116,8 +119,14 @@ def test_double_top_is_the_mirror_image_and_goes_short() -> None:
     assert 130.5 < match.stop < 133.0
 
 
+def _named(matches: list[PatternMatch], name: str) -> PatternMatch:
+    (match,) = [m for m in matches if m.name == name]
+    return match
+
+
 def test_inverse_head_and_shoulders_breaks_the_neckline() -> None:
-    (match,) = find_patterns(_bars(INVERSE_HS))
+    # La caída hacia la cabeza pasa antes por una bandera bajista; aquí interesa el giro.
+    match = _named(find_patterns(_bars(INVERSE_HS)), "inv_head_shoulders")
 
     assert (match.name, match.direction, match.bar) == ("inv_head_shoulders", "long", 93)
     assert match.entry == pytest.approx(115.5)
@@ -127,10 +136,82 @@ def test_inverse_head_and_shoulders_breaks_the_neckline() -> None:
 
 
 def test_head_and_shoulders_is_the_mirror_image_and_goes_short() -> None:
-    (match,) = find_patterns(_bars(INVERSE_HS, mirror=230.0))
+    match = _named(find_patterns(_bars(INVERSE_HS, mirror=230.0)), "head_shoulders")
 
     assert (match.name, match.direction, match.bar) == ("head_shoulders", "short", 93)
     assert match.target == pytest.approx(114.5 - 21.0)
+
+
+# --- continuación ---------------------------------------------------------------
+
+# Mínimos en 100, 107 y 113 bajo dos máximos en 120, y ruptura de la resistencia.
+ASCENDING_TRIANGLE: Waypoints = [
+    (0, 110),
+    (15, 100),
+    (30, 120),
+    (40, 107),
+    (50, 120),
+    (58, 113),
+    (68, 126),
+]
+# Lateral en 100, mástil hasta 120 en diez sesiones, pausa hasta 115 y nuevo máximo.
+BULL_FLAG: Waypoints = [(0, 100), (20, 100), (30, 120), (38, 115), (42, 123)]
+
+
+def test_ascending_triangle_breaks_the_flat_resistance() -> None:
+    (match,) = find_patterns(_bars(ASCENDING_TRIANGLE))
+
+    assert (match.name, match.direction, match.bar) == ("ascending_triangle", "long", 64)
+    assert match.entry == pytest.approx(120.5)  # los dos máximos
+    assert match.target == pytest.approx(120.5 + 14.0)  # la base del triángulo, proyectada
+    assert 110.0 < match.stop < 112.5  # bajo el último mínimo creciente
+    assert [p.index for p in match.pivots] == [15, 30, 40, 50, 58]
+
+
+def test_descending_triangle_is_the_mirror_image_and_goes_short() -> None:
+    (match,) = find_patterns(_bars(ASCENDING_TRIANGLE, mirror=230.0))
+
+    assert (match.name, match.direction, match.bar) == ("descending_triangle", "short", 64)
+    assert match.target == pytest.approx(109.5 - 14.0)
+
+
+def test_rising_lows_under_a_flat_line_are_not_also_a_reversal() -> None:
+    # El triángulo no es un doble suelo, y el HCH invertido no es un triángulo.
+    assert {m.name for m in find_patterns(_bars(ASCENDING_TRIANGLE))} == {"ascending_triangle"}
+    assert "ascending_triangle" not in {m.name for m in find_patterns(_bars(INVERSE_HS))}
+
+
+def test_bull_flag_completes_on_the_close_above_the_pole_high() -> None:
+    (match,) = find_patterns(_bars(BULL_FLAG))
+
+    assert (match.name, match.direction, match.bar) == ("bull_flag", "long", 41)
+    assert match.entry == pytest.approx(120.5)  # máximo del mástil
+    assert match.target == pytest.approx(114.5 + 21.0)  # el mástil desde el mínimo de la pausa
+    assert 113.5 < match.stop < 114.5
+    assert [(p.kind, p.index) for p in match.pivots[1:]] == [("H", 30), ("L", 38)]
+    assert match.pivots[0].price == pytest.approx(99.5)  # el arranque del mástil
+
+
+def test_bear_flag_is_the_mirror_image_and_goes_short() -> None:
+    (match,) = find_patterns(_bars(BULL_FLAG, mirror=230.0))
+
+    assert (match.name, match.direction, match.bar) == ("bear_flag", "short", 41)
+    assert match.entry == pytest.approx(109.5)
+    assert match.target == pytest.approx(115.5 - 21.0)
+    assert [(p.kind, p.index) for p in match.pivots[1:]] == [("L", 30), ("H", 38)]
+
+
+@pytest.mark.parametrize(
+    ("waypoints", "why"),
+    [
+        ([(0, 100), (20, 100), (30, 120), (38, 108), (46, 123)], "la pausa devuelve demasiado"),
+        ([(0, 100), (20, 100), (30, 120), (32, 118), (34, 124)], "pausa demasiado corta"),
+        ([(0, 100), (20, 100), (30, 104), (38, 103), (42, 106)], "mástil sin fuerza"),
+        ([(0, 100), (20, 100), (30, 120), (38, 115), (42, 119)], "no supera el mástil"),
+    ],
+)
+def test_near_misses_are_not_a_bull_flag(waypoints: Waypoints, why: str) -> None:
+    assert "bull_flag" not in {m.name for m in find_patterns(_bars(waypoints))}, why
 
 
 @pytest.mark.parametrize(
@@ -180,7 +261,7 @@ def test_rows_past_the_warmup_do_not_depend_on_where_the_window_starts() -> None
         kept = window - PATTERN_WARMUP  # las filas que el servicio escribiría
         expected = full.iloc[-kept:].reset_index(drop=True)
         pd.testing.assert_frame_equal(tail.iloc[-kept:].reset_index(drop=True), expected)
-        compared += int(expected.loc[:, list(PATTERN_COLUMNS[:4])].to_numpy().sum())
+        compared += int(expected.loc[:, FLAGS].to_numpy().sum())
     assert compared > 0
 
 
@@ -215,7 +296,7 @@ def test_short_history_gives_no_patterns_and_no_errors() -> None:
     values = pattern_columns(_frame(np.linspace(100, 105, 10, dtype=np.float64)))
 
     assert len(values) == 10
-    assert values.loc[:, list(PATTERN_COLUMNS[:4])].to_numpy().sum() == 0.0
+    assert values.loc[:, FLAGS].to_numpy().sum() == 0.0
     assert values["pat_stop"].isna().all()
 
 

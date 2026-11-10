@@ -37,5 +37,9 @@ rules:
   - oversold_uptrend               # convive con los patrones para poder compararlos
   - double_bottom                  # patrones chartistas: largo
   - inv_head_shoulders
+  - ascending_triangle
+  - bull_flag
   - double_top                     # patrones chartistas: corto
   - head_shoulders
+  - descending_triangle
+  - bear_flag

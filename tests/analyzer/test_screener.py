@@ -294,7 +294,8 @@ def test_step_uses_region_rules_and_leaves_candidates(cfg_tmp: AppConfig) -> Non
 
     assert outcome.message == (
         "1 candidato entre 1 valores: oversold_uptrend 1/1, double_bottom 0/1, "
-        "inv_head_shoulders 0/1, double_top 0/1, head_shoulders 0/1; AAPL 1.00"
+        "inv_head_shoulders 0/1, ascending_triangle 0/1, bull_flag 0/1, double_top 0/1, "
+        "head_shoulders 0/1, descending_triangle 0/1, bear_flag 0/1; AAPL 1.00"
     )
     assert (
         ctx.data["candidates"]["rule_hash"].iloc[0] == cfg_tmp.rules["oversold_uptrend"].source_hash

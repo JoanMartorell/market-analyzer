@@ -87,13 +87,19 @@ siguiente sesión de su bolsa.
 
 ## Patrones chartistas
 
-Además de la regla de indicadores (`oversold_uptrend`), cada región evalúa cuatro
-figuras de giro: doble suelo y hombro-cabeza-hombro invertido (COMPRAR), doble techo y
-hombro-cabeza-hombro (VENDER EN CORTO).
+Además de la regla de indicadores (`oversold_uptrend`), cada región evalúa ocho figuras:
+
+| | COMPRAR | VENDER EN CORTO |
+|---|---|---|
+| Giro | doble suelo, hombro-cabeza-hombro invertido | doble techo, hombro-cabeza-hombro |
+| Continuación | triángulo ascendente, bandera alcista | triángulo descendente, bandera bajista |
 
 - El detector (`src/analyzer/patterns/`) saca los pivotes del precio con un zigzag en
   ATR y da la figura por completada el día en que el cierre rompe su línea. Lo que se
   decide un día solo usa datos hasta ese día.
+- Las banderas no salen de los pivotes (su pausa es demasiado pequeña): se miran en las
+  velas anteriores a la que rompe. Mástil de al menos 6 ATR en 15 sesiones, pausa de 4 a
+  20 que devuelve como mucho la mitad, y cierre por encima del máximo del mástil.
 - El resultado entra en la tabla de indicadores: `pat_<patrón>` vale 1 el día de la
   ruptura, y `pat_entry`, `pat_stop` y `pat_target` son los niveles de ese día. Las
   reglas (`config/rules/double_bottom.yaml`...) los usan como cualquier otra variable.

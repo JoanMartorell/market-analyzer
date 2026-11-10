@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from analyzer.patterns import PATTERNS
 from core.config import AppConfig, ConfigError, Env, Rule, load_config
 from core.config.schema import RegionProviders
 
@@ -27,9 +28,16 @@ def test_repo_config_loads(empty_env: Env) -> None:
         "double_top",
         "inv_head_shoulders",
         "head_shoulders",
+        "ascending_triangle",
+        "descending_triangle",
+        "bull_flag",
+        "bear_flag",
     }
     # La regla de indicadores convive con las de patrones en todas las regiones.
-    assert all(len(region.rules) == 5 for region in cfg.regions.values())
+    assert all(len(region.rules) == 9 for region in cfg.regions.values())
+    # Cada patrón del catálogo tiene su regla, con la dirección que le corresponde.
+    for spec in PATTERNS:
+        assert cfg.rules[spec.name].output.direction == spec.direction
     assert cfg.data_dir == (ROOT / "data").resolve()
 
 

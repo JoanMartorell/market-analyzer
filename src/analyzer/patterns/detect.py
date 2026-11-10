@@ -11,6 +11,10 @@ vale lo mismo calcular un día suelto que recalcular el histórico entero
 tras un split, y por eso el resultado se puede evaluar después contra lo
 que pasó.
 
+Las banderas no salen de los pivotes: su pausa es demasiado pequeña para
+el zigzag. Se comprueban en cada vela cuyo cierre supera el máximo de las
+anteriores, mirando hacia atrás el mástil y la pausa (``continuation``).
+
 Todo se calcula en escala ajustada (un dividendo no es un movimiento). Los
 niveles que van a las columnas ``pat_*`` se devuelven a la escala del
 precio real del día de la ruptura, que es contra la que se compara el
@@ -22,8 +26,13 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from analyzer.patterns.continuation import Flag, ascending_triangle, bull_flag
 from analyzer.patterns.model import (
+    ASCENDING_TRIANGLE,
+    BEAR_FLAG,
+    BULL_FLAG,
     DEFAULT_PARAMS,
+    DESCENDING_TRIANGLE,
     DOUBLE_BOTTOM,
     DOUBLE_TOP,
     ENTRY_COLUMN,
@@ -37,6 +46,7 @@ from analyzer.patterns.model import (
     PatternParams,
     PatternSpec,
     Pivot,
+    PivotKind,
 )
 from analyzer.patterns.pivots import Array, ZigZag, average_true_range
 from analyzer.patterns.reversal import (
@@ -56,7 +66,10 @@ _DETECTORS: tuple[tuple[PatternSpec, int, Detector], ...] = (
     (DOUBLE_TOP, -1, double_bottom),
     (INV_HEAD_SHOULDERS, 1, inverse_head_shoulders),
     (HEAD_SHOULDERS, -1, inverse_head_shoulders),
+    (ASCENDING_TRIANGLE, 1, ascending_triangle),
+    (DESCENDING_TRIANGLE, -1, ascending_triangle),
 )
+_FLAGS: tuple[tuple[PatternSpec, int], ...] = ((BULL_FLAG, 1), (BEAR_FLAG, -1))
 
 
 class _Armed:
@@ -67,6 +80,7 @@ class _Armed:
         self.sign = sign
         self.shape = shape
         self.pivots = tuple(pivots[-shape.pivots :])
+        self.done = False
 
     def match(self, t: int) -> PatternMatch:
         level = self.shape.level(t)
@@ -138,27 +152,86 @@ def scan(high: Array, low: Array, close: Array, params: PatternParams) -> list[P
     """Recorre la serie y devuelve los patrones en el orden en que se completan."""
     atr = average_true_range(high, low, close, params.atr_length)
     zigzag = ZigZag(high, low, atr, params.reversal_atr)
+    flags = [_FlagScan(spec, sign, high, low, close, params) for spec, sign in _FLAGS]
     armed: list[_Armed] = []
     matches: list[PatternMatch] = []
     for t in range(len(close)):
         if zigzag.step(t) is not None:
             armed = _arm(zigzag.pivots, close, atr, t, params)
-        if not armed:
-            continue
-        price = close[t]
-        waiting: list[_Armed] = []
-        for figure in armed:
-            level = figure.shape.level(t)
-            normalized = figure.sign * price
-            if not normalized > level:  # un cierre NaN tampoco rompe
-                waiting.append(figure)
-            elif (
-                t - figure.pivots[0].index <= params.max_span
-                and normalized < level + figure.shape.height  # objetivo sin consumir
-            ):
-                matches.append(figure.match(t))
-        armed = waiting
+        matches.extend(_breakouts(armed, close, t, params))
+        armed = [figure for figure in armed if not figure.done]
+        for scanner in flags:
+            flag = scanner.at(t, atr, params)
+            if flag is not None:
+                matches.append(flag)
     return matches
+
+
+class _FlagScan:
+    """Banderas de un signo: la serie normalizada y en qué velas merece la pena mirar."""
+
+    def __init__(
+        self,
+        spec: PatternSpec,
+        sign: int,
+        high: Array,
+        low: Array,
+        close: Array,
+        params: PatternParams,
+    ) -> None:
+        self.spec = spec
+        self.sign = sign
+        # Boca abajo, el máximo es el mínimo cambiado de signo.
+        self.high, self.low = (high, low) if sign > 0 else (-low, -high)
+        self.close = sign * close
+        ceiling = pd.Series(self.high).rolling(params.flag_max_bars, min_periods=1).max().shift(1)
+        self.breaks = self.close > ceiling.to_numpy(dtype="float64")
+
+    def at(self, t: int, atr: Array, params: PatternParams) -> PatternMatch | None:
+        if not self.breaks[t]:
+            return None
+        flag = bull_flag(self.high, self.low, self.close, atr, t, params)
+        return None if flag is None else self._match(flag, t)
+
+    def _match(self, flag: Flag, t: int) -> PatternMatch:
+        sign = self.sign
+        low_kind: PivotKind = "L" if sign > 0 else "H"
+        top_kind: PivotKind = "H" if sign > 0 else "L"
+        points = ((flag.base, low_kind), (flag.top, top_kind), (flag.low, low_kind))
+        top_index, top = flag.top
+        return PatternMatch(
+            name=self.spec.name,
+            direction=self.spec.direction,
+            bar=t,
+            entry=sign * top,
+            stop=sign * flag.stop,
+            target=sign * flag.target,
+            pivots=tuple(
+                Pivot(index=index, price=sign * value, kind=kind, confirmed_at=t)
+                for (index, value), kind in points
+            ),
+            neckline=((top_index, sign * top), (t, sign * top)),
+        )
+
+
+def _breakouts(
+    armed: list[_Armed], close: Array, t: int, params: PatternParams
+) -> list[PatternMatch]:
+    """Figuras armadas que el cierre de ``t`` rompe; las deja marcadas como resueltas."""
+    found: list[PatternMatch] = []
+    price = close[t]
+    for figure in armed:
+        level = figure.shape.level(t)
+        normalized = figure.sign * price
+        if not normalized > level:  # un cierre NaN tampoco rompe
+            continue
+        figure.done = True  # rota: completa el patrón o llega tarde, pero ya no espera
+        if (
+            t - figure.pivots[0].index <= params.max_span
+            and normalized < level + figure.shape.height  # objetivo sin consumir
+        ):
+            found.append(figure.match(t))
+    return found
 
 
 def _arm(
