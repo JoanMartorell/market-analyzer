@@ -71,19 +71,42 @@ Doce pasos, en este orden y en ningún otro sitio (`src/analyzer/steps/__init__.
 | 1 | `ingest` | Velas EOD a `staging`. yfinance por lotes; lo que deje sin la vela del día lo rescata `prices_fallback` (EODHD, 20 llamadas/día). |
 | 2 | `quality` | Cobertura ≥ 98 %, fecha del feed, saltos, volumen cero. Si pasa, promueve a `prod`. |
 | 3 | `corporate_actions` | Splits y dividendos; marca qué histórico hay que recalcular. |
-| 4 | `indicators` | Incremental sobre las últimas 250 sesiones (RSI, SMA, MACD...). |
+| 4 | `indicators` | Incremental sobre las últimas 250 sesiones (RSI, SMA, MACD...) y patrones chartistas. |
 | 5 | `snapshot` | Panel del día con hash sha256; lo que verá el screener. |
 | 6 | `screener` | Reglas YAML sobre el panel: candidatos con puntuación y condiciones cumplidas. |
 | 7 | `news` | Solo para candidatos: RSS de Yahoo y CNBC, Finnhub. |
 | 8 | `dedup_sentiment` | Cascada MinHash → embeddings → DBSCAN; FinBERT sobre el representante. |
 | 9 | `llm` | Una llamada con salida estructurada: veredicto, confianza, motivo en una línea. |
 | 10 | `persist` | Señal con hash de regla y panel, veredicto y sesión de ejecución. |
-| 11 | entrega | Mensaje del día por consola o Telegram (lo hace `core`, no un paso). |
+| 11 | entrega | Resumen del día y un mensaje con gráfico por cada operación, por consola o Telegram (lo hace `core`, no un paso). |
 | 12 | `reconcile` | Al día siguiente: apertura real frente al cierre asumido; `conciliada`, `desviada` o `sin_precio`. |
 
 `as_of` nunca es "hoy": es la última sesión cuyo cierre es anterior al lanzamiento en
 todos los mercados de la región. Las señales del día D se ejecutan en la apertura de la
 siguiente sesión de su bolsa.
+
+## Patrones chartistas
+
+Además de la regla de indicadores (`oversold_uptrend`), cada región evalúa cuatro
+figuras de giro: doble suelo y hombro-cabeza-hombro invertido (COMPRAR), doble techo y
+hombro-cabeza-hombro (VENDER EN CORTO).
+
+- El detector (`src/analyzer/patterns/`) saca los pivotes del precio con un zigzag en
+  ATR y da la figura por completada el día en que el cierre rompe su línea. Lo que se
+  decide un día solo usa datos hasta ese día.
+- El resultado entra en la tabla de indicadores: `pat_<patrón>` vale 1 el día de la
+  ruptura, y `pat_entry`, `pat_stop` y `pat_target` son los niveles de ese día. Las
+  reglas (`config/rules/double_bottom.yaml`...) los usan como cualquier otra variable.
+- La señal guarda el patrón, el stop y el objetivo. El resumen los enseña, y cada
+  operación recomendada llega en un mensaje propio con el gráfico de la figura
+  (`delivery.notify_operations`).
+- `analyzer patterns stats -r americas` pasa el detector por el histórico guardado y
+  cuenta cuántos patrones llegaron al objetivo antes que al stop. No descarga nada ni
+  llama al modelo; es una medida de frecuencia y desenlace, no un backtest.
+
+Los umbrales del detector están en `PatternParams` (`patterns/model.py`), en código y no
+en YAML: las columnas se guardan día a día y un umbral cambiado a mano dejaría un
+histórico calculado con dos criterios.
 
 ## Regiones
 
@@ -151,8 +174,10 @@ tocan la red: proveedores, buscadores y clientes HTTP se sustituyen por dobles.
 Estructura:
 
 ```
-src/core/        cli, app (orquestación), config (esquema + cargador), scheduler, digest
-src/analyzer/    engine, steps/<paso>/{step,service}, storage/<tabla>, rules, universe
+src/core/        cli, app (orquestación), config (esquema + cargador), scheduler, digest,
+                 operations (mensaje por operación), charts (gráfico de la figura)
+src/analyzer/    engine, steps/<paso>/{step,service}, storage/<tabla>, rules, universe,
+                 patterns (pivotes, figuras, evaluación)
 src/delivery/    consola y Telegram
 config/          YAML versionado         prompts/   prompt del modelo
 tests/           espejo de src           data/      DuckDB, universos (fuera de git)

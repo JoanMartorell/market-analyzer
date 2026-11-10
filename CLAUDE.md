@@ -59,13 +59,17 @@ src/core/            entrada y orquestación
   app.py             run_region, reconcile_region, notify, backfill, telegram_chats
   config/            schema.py (pydantic, StrictModel), loader.py (validación cruzada), env.py
   scheduler.py       analyzer serve
-  digest.py          el mensaje del día (COMPRAR / VENDER / VIGILAR)
+  digest.py          el mensaje del día (COMPRAR / VENDER EN CORTO / VIGILAR)
+  operations.py      un mensaje por operación recomendada, con su gráfico
+  charts.py          el PNG de la figura (matplotlib sin pyplot)
 src/analyzer/
   engine.py          Step, StepContext, StepOutcome, StepError, PipelineResult
   steps/__init__.py  ORDEN de los pasos; vive solo aquí
   steps/<paso>/      step.py (adaptador al motor) + service.py (lógica pura, testeable)
   storage/           una clase Table por tabla DuckDB, DDL + migraciones en COLUMNS_ADDED
   rules/             parser AST + funciones permitidas
+  patterns/          patrones chartistas: pivots (zigzag en ATR), reversal (figuras),
+                     detect (recorrido causal -> columnas pat_*), evaluate (desenlace)
   universe/          constituyentes point-in-time: fuentes, enriquecedores, build
   sessions.py        qué sesión procesar (as_of nunca es "hoy")
   yahoo.py           sufijos de Yahoo por MIC (compartido por proveedor y universo)
@@ -93,6 +97,13 @@ tests/               espejo de src; conftest con cfg real sin credenciales
 - **Un universo**: `UniverseSpec` con fuente y enriquecedores en `universe/sources/`,
   registrado en `universe/registry.py`. `history=False` para instantáneas que se
   reconstruyen a diario.
+- **Un patrón chartista**: función en `patterns/` que recibe los últimos pivotes
+  normalizados (`Point`) y devuelve la figura armada (`Shape`: línea de ruptura, altura,
+  stop), escrita solo en alcista; su `PatternSpec` en `model.py` (`PATTERNS`) y su
+  entrada en `_DETECTORS` de `detect.py` con signo +1 y, para la versión bajista, -1. La
+  columna `pat_<nombre>` aparece sola. Después, la regla YAML con `window: 1` y su alta
+  en las regiones. Nada de lo que se decide en la vela `t` puede mirar más allá de `t`:
+  el test de prefijos de `tests/analyzer/test_patterns.py` lo vigila.
 - **Un parámetro de configuración**: campo en `schema.py` (modelos `StrictModel`,
   `extra="forbid"`) con valor por defecto sensato, valor y comentario en el YAML. Lo
   que es secreto va a `env.py` y `.env.example`.
@@ -141,6 +152,15 @@ tests/               espejo de src; conftest con cfg real sin credenciales
   reglas técnicas) están activas; dos regiones activas no pueden compartir bolsa porque
   la clave de señal no lleva región. Europa depende de
   que Yahoo publique a tiempo (EODHD gratuito solo rescata 20 valores/día).
+- Patrones chartistas: cuatro figuras de giro (doble suelo/techo, HCH y HCH invertido)
+  conviven con `oversold_uptrend` en todas las regiones. Triángulos y banderas están
+  pendientes. Los umbrales (`PatternParams`) van en código, no en YAML. Las columnas
+  `pat_*` solo se rellenan en filas nuevas: los días anteriores a su alta quedan a NULL
+  salvo recálculo. `analyzer patterns stats -r <región>` mide frecuencia y desenlace
+  sobre prod sin gastar cupo.
+- Las señales llevan `pattern`, `stop_price` y `target_price` (nulos sin patrón), pero
+  nadie sigue todavía si la operación tocó stop u objetivo: `reconcile` solo mide el gap
+  de apertura.
 - `reevaluation_gate` (Europa) existe en el esquema pero ningún paso lo ejecuta.
 - FMP y FRED están declarados pero sin uso.
 - No hay conversión de divisas: cada señal va en su moneda local.

@@ -34,4 +34,8 @@ news:
   strategy: native                 # native | translate | technical_only
 
 rules:
-  - oversold_uptrend
+  - oversold_uptrend               # convive con los patrones para poder compararlos
+  - double_bottom                  # patrones chartistas: largo
+  - inv_head_shoulders
+  - double_top                     # patrones chartistas: corto
+  - head_shoulders

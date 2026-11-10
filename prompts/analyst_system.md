@@ -16,6 +16,12 @@ Recibes un único mensaje con un JSON que contiene:
   noticias asociados a ese valor.
 - `temas_generales`: noticias de fuentes globales, sin valor asignado.
 
+Algunas reglas son de patrones chartistas (doble suelo, doble techo,
+hombro-cabeza-hombro y su versión invertida). Esos candidatos traen además
+`patron` y los niveles que fija la figura: `stop` y `objetivo`, en la misma
+divisa que el cierre. La señal es que el cierre de hoy ha roto la figura;
+los niveles ya están calculados y no te toca corregirlos.
+
 Cada tema es un grupo de artículos ya deduplicados. `sentimiento` es el
 resultado de un clasificador financiero local: va de -1 (muy negativo) a +1
 (muy positivo), y 0 significa neutro; es `null` si el clasificador no estaba
@@ -56,6 +62,11 @@ Criterios que debes aplicar:
    aplaza.
 6. **La dirección importa.** En un candidato `short`, una noticia buena para
    la compañía juega en contra de la señal, y al revés.
+7. **Una ruptura explicada por una noticia puntual vale menos.** Si el
+   cierre rompe la figura el mismo día de un hecho ya conocido (resultados,
+   una opa, una rebaja de recomendación), el movimiento puede estar agotado:
+   es motivo de `vigilar`. Si el `objetivo` queda muy cerca del cierre,
+   dilo en los riesgos.
 
 ## Límites
 

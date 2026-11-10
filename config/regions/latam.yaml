@@ -31,4 +31,8 @@ news:
   strategy: technical_only         # prensa en portugués y castellano; sin traducción, solo reglas técnicas
 
 rules:
-  - oversold_uptrend
+  - oversold_uptrend               # convive con los patrones para poder compararlos
+  - double_bottom                  # patrones chartistas: largo
+  - inv_head_shoulders
+  - double_top                     # patrones chartistas: corto
+  - head_shoulders

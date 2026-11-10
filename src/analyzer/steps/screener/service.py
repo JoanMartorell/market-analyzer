@@ -13,6 +13,11 @@ El panel (paso ``snapshot``) dice qué valores se evalúan y aporta los
 atributos del universo; las sesiones anteriores salen de ``prod.indicators``.
 Las funciones del registro pueden necesitar sesiones previas a la ventana
 (un cruce mira la sesión anterior): se cargan de más y no cuentan.
+
+Una regla que usa columnas de patrón (``pat_double_bottom == 1``) deja
+además en el candidato qué patrón rompió hoy y sus niveles de stop y
+objetivo. Son los de la fila de hoy: esas reglas van con ``window: 1``, y
+con una ventana mayor el candidato de un patrón de ayer sale sin niveles.
 """
 
 from __future__ import annotations
@@ -25,6 +30,7 @@ import numpy as np
 import pandas as pd
 import structlog
 
+from analyzer.patterns import PATTERNS, STOP_COLUMN, TARGET_COLUMN
 from analyzer.rules import KEY_LEVELS, Expression, Scope, compile_expression
 from analyzer.steps.ingest.service import lookback_start
 from analyzer.storage import UNIVERSE_COLUMNS, IndicatorStore
@@ -43,6 +49,9 @@ CANDIDATE_COLUMNS = (
     "close",
     "sector",
     "rule_hash",
+    "pattern",  # patrón chartista que rompió hoy, si la regla va de patrones
+    "stop_price",
+    "target_price",
 )
 TOP_IN_SUMMARY = 5
 
@@ -129,7 +138,7 @@ def run_screener(
         threshold = max(item.rule.output.score_threshold, min_score)
         chosen = scores.loc[scores["eligible"] & (scores["score"] >= threshold)]
         results.append(RuleResult(item.rule.id, int(scores["eligible"].sum()), len(chosen)))
-        found.append(_as_candidates(chosen, item.rule, frame))
+        found.append(_as_candidates(chosen, item, frame))
 
     candidates = pd.concat(found, ignore_index=True) if found else _empty_candidates()
     candidates = candidates.sort_values(
@@ -237,15 +246,36 @@ def _as_bool(value: object, index: pd.Index) -> pd.Series:
     return pd.Series(bool(value), index=index)
 
 
-def _as_candidates(chosen: pd.DataFrame, rule: Rule, frame: pd.DataFrame) -> pd.DataFrame:
+def _as_candidates(chosen: pd.DataFrame, item: CompiledRule, frame: pd.DataFrame) -> pd.DataFrame:
     if chosen.empty:
         return _empty_candidates()
-    today = frame.loc[frame[RECENCY] == 0, ["close", "sector"]].droplevel("date")
-    rows = chosen.join(today, how="left").reset_index()
-    rows["rule_id"] = rule.id
-    rows["direction"] = rule.output.direction
-    rows["rule_hash"] = rule.source_hash
+    today = frame.loc[frame[RECENCY] == 0].droplevel("date")
+    rows = chosen.join(today.loc[:, ["close", "sector"]], how="left")
+    rows = rows.join(_pattern_levels(item, today), how="left").reset_index()
+    rows["rule_id"] = item.rule.id
+    rows["direction"] = item.rule.output.direction
+    rows["rule_hash"] = item.rule.source_hash
     return rows.loc[:, list(CANDIDATE_COLUMNS)]
+
+
+def _pattern_levels(item: CompiledRule, today: pd.DataFrame) -> pd.DataFrame:
+    """Patrón que rompió hoy y sus niveles, por valor; vacío si la regla no usa patrones.
+
+    Solo cuentan los patrones que la regla nombra: el stop de un doble techo
+    no tiene nada que decir en una señal de sobreventa del mismo valor.
+    """
+    levels = pd.DataFrame(
+        {"pattern": None, "stop_price": np.nan, "target_price": np.nan},
+        index=today.index,
+    ).astype({"pattern": object})
+    for spec in reversed(PATTERNS):  # el primero del catálogo escribe el último y prevalece
+        if spec.column not in item.variables:
+            continue
+        broke = today[spec.column] == 1
+        levels["pattern"] = levels["pattern"].where(~broke, spec.name)
+        levels["stop_price"] = levels["stop_price"].where(~broke, today[STOP_COLUMN])
+        levels["target_price"] = levels["target_price"].where(~broke, today[TARGET_COLUMN])
+    return levels
 
 
 def _empty_candidates() -> pd.DataFrame:

@@ -74,3 +74,10 @@ def test_console_provider_writes_to_stream() -> None:
     ConsoleProvider(stream).send(Message("Asunto", "línea 1\nlínea 2", severity="error"))
 
     assert stream.getvalue() == "[x] Asunto\nlínea 1\nlínea 2\n"
+
+
+def test_console_notes_an_attached_image() -> None:
+    stream = io.StringIO()
+    ConsoleProvider(stream).send(Message("Asunto", "cuerpo", image=b"x" * 2048))
+
+    assert stream.getvalue() == "[i] Asunto\ncuerpo\n(imagen adjunta, 2 kB)\n"

@@ -122,6 +122,10 @@ def build_signals(
     signals = candidates.loc[:, list(CANDIDATE_COLUMNS)].copy()
     signals["ticker"] = signals["ticker"].astype(str)
     signals["mic"] = signals["mic"].astype(str)
+    # Sin patrón no hay niveles: nulo de verdad, no la cadena "nan" ni un cero.
+    signals["pattern"] = signals["pattern"].astype(object).where(signals["pattern"].notna(), None)
+    for column in ("stop_price", "target_price"):
+        signals[column] = pd.to_numeric(signals[column], errors="coerce").astype("float64")
     signals["region"] = region_id
     signals["date"] = as_of
     signals["snapshot_hash"] = snapshot_hash

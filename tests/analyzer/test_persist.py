@@ -348,3 +348,23 @@ def test_the_step_without_candidates_is_ok(cfg_tmp: AppConfig) -> None:
     assert outcome.status is StepStatus.OK
     assert outcome.message.startswith("sin señales")
     assert ctx.data["signals"].empty
+
+
+def test_pattern_and_levels_are_saved_and_stay_null_without_a_pattern(store: SignalStore) -> None:
+    figure = _candidate(
+        "AAA",
+        rule_id="double_bottom",
+        pattern="double_bottom",
+        stop_price=95.5,
+        target_price=108.25,
+    )
+    signals = _build(_candidates(figure, _candidate("BBB")), None)
+    assert signals["pattern"].tolist() == ["double_bottom", None]
+
+    store.replace_day(REGION, AS_OF, signals)
+    saved = store.load(REGION, AS_OF).set_index("ticker")
+
+    assert saved.loc["AAA", "pattern"] == "double_bottom"
+    assert (saved.loc["AAA", "stop_price"], saved.loc["AAA", "target_price"]) == (95.5, 108.25)
+    # NULL de verdad, no la cadena "nan" ni un cero.
+    assert saved.loc["BBB", ["pattern", "stop_price", "target_price"]].isna().all()

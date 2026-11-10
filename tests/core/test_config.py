@@ -21,7 +21,15 @@ def test_repo_config_loads(empty_env: Env) -> None:
     assert cfg.settings.base_currency == "EUR"
     assert set(cfg.regions) == {"americas", "europe", "apac", "latam"}
     assert "americas" in [r.id for r in cfg.enabled_regions()]
-    assert set(cfg.rules) == {"oversold_uptrend"}
+    assert set(cfg.rules) == {
+        "oversold_uptrend",
+        "double_bottom",
+        "double_top",
+        "inv_head_shoulders",
+        "head_shoulders",
+    }
+    # La regla de indicadores convive con las de patrones en todas las regiones.
+    assert all(len(region.rules) == 5 for region in cfg.regions.values())
     assert cfg.data_dir == (ROOT / "data").resolve()
 
 

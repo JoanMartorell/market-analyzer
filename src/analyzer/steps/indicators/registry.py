@@ -10,6 +10,12 @@ que las reglas las usen como variables.
 ``warmup`` es cuántas velas previas necesita un indicador para dar un valor
 completo. Por debajo de eso el resultado es un artefacto de la ventana, no
 del mercado, y el servicio no lo persiste.
+
+Los patrones chartistas (``analyzer.patterns``) entran como un indicador
+más: una columna ``pat_<patrón>`` que vale 1 el día de la ruptura y los
+niveles ``pat_entry``, ``pat_stop`` y ``pat_target`` de ese día. Así las
+reglas los usan como cualquier otra variable y quedan dentro del panel y de
+su hash.
 """
 
 from __future__ import annotations
@@ -19,6 +25,8 @@ from dataclasses import dataclass
 
 import pandas as pd
 import pandas_ta as ta
+
+from analyzer.patterns import PATTERN_COLUMNS, PATTERN_WARMUP, pattern_columns
 
 Compute = Callable[[pd.DataFrame], pd.DataFrame]
 
@@ -103,6 +111,7 @@ INDICATORS: tuple[Indicator, ...] = (
     Indicator("atr_14", ("atr_14",), 14, _atr(14)),
     Indicator("avg_volume_20", ("avg_volume_20",), 19, _avg_volume(20)),
     Indicator("returns", ("ret_1d", "ret_5d", "ret_20d"), 20, _returns(1, 5, 20)),
+    Indicator("patterns", PATTERN_COLUMNS, PATTERN_WARMUP, pattern_columns),
 )
 
 INDICATOR_COLUMNS: tuple[str, ...] = tuple(c for ind in INDICATORS for c in ind.columns)

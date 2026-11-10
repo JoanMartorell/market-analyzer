@@ -200,6 +200,80 @@ def test_region_without_rules_fails(store: IndicatorStore) -> None:
         _run(store, _panel(store, {"AAPL": "Technology"}), [])
 
 
+# --- reglas de patrones ---------------------------------------------------------------
+
+
+def _pattern_rule() -> Rule:
+    return _rule(
+        id="double_bottom",
+        window=1,
+        conditions=[
+            {"expr": "pat_double_bottom == 1", "weight": 0.6, "required": True},
+            {"expr": "volume > 1.2 * avg_volume_20", "weight": 0.2},
+            {"expr": "(pat_target - close) >= (close - pat_stop)", "weight": 0.2},
+        ],
+        universe_filters=[],
+        output={"score_threshold": 0.6},
+    )
+
+
+def _with_breakout(history: pd.DataFrame, *, sessions_ago: int = 0) -> pd.DataFrame:
+    """Marca un doble suelo roto hace ``sessions_ago`` sesiones, con stop 95 y objetivo 108."""
+    out = history.copy()
+    out[["pat_entry", "pat_stop", "pat_target"]] = np.nan  # sin patrón no hay niveles
+    row = out.index[-1 - sessions_ago]
+    out.loc[row, ["pat_double_bottom", "pat_entry", "pat_stop", "pat_target"]] = [
+        1.0,
+        99.0,
+        95.0,
+        108.0,
+    ]
+    return out
+
+
+def test_pattern_rule_leaves_the_pattern_and_its_levels_in_the_candidate(
+    store: IndicatorStore,
+) -> None:
+    store.upsert(
+        pd.concat(
+            [
+                _with_breakout(_history("BRK")),  # rompe hoy: patrón + recorrido, 0.8
+                _with_breakout(_history("OLD"), sessions_ago=1),  # rompió ayer: fuera de ventana
+                _history("FLAT"),
+            ]
+        )
+    )
+    panel = _panel(store, dict.fromkeys(["BRK", "OLD", "FLAT"], "Technology"))
+
+    report = _run(store, panel, [_pattern_rule()])
+
+    assert report.candidates["ticker"].tolist() == ["BRK"]
+    row = report.candidates.iloc[0]
+    assert row["score"] == 0.8
+    assert (row["pattern"], row["stop_price"], row["target_price"]) == (
+        "double_bottom",
+        95.0,
+        108.0,
+    )
+    assert row["conditions_met"] == (
+        "pat_double_bottom == 1; (pat_target - close) >= (close - pat_stop)"
+    )
+
+
+def test_a_rule_without_patterns_never_borrows_pattern_levels(store: IndicatorStore) -> None:
+    # El mismo valor cumple la regla de indicadores y rompe un doble suelo hoy.
+    store.upsert(_with_breakout(_history("AAPL", rsi=OVERSOLD_RSI, macd=CROSS_MACD)))
+    panel = _panel(store, {"AAPL": "Technology"})
+
+    report = _run(store, panel, [_rule(), _pattern_rule()])
+
+    by_rule = report.candidates.set_index("rule_id")
+    assert set(by_rule.index) == {"oversold_uptrend", "double_bottom"}
+    assert by_rule.loc["double_bottom", "pattern"] == "double_bottom"
+    assert pd.isna(by_rule.loc["oversold_uptrend", "pattern"])
+    assert pd.isna(by_rule.loc["oversold_uptrend", "stop_price"])
+
+
 # --- paso -----------------------------------------------------------------------------
 
 
@@ -218,7 +292,10 @@ def test_step_uses_region_rules_and_leaves_candidates(cfg_tmp: AppConfig) -> Non
 
     outcome = Screener().run(ctx)
 
-    assert outcome.message == "1 candidato entre 1 valores: oversold_uptrend 1/1; AAPL 1.00"
+    assert outcome.message == (
+        "1 candidato entre 1 valores: oversold_uptrend 1/1, double_bottom 0/1, "
+        "inv_head_shoulders 0/1, double_top 0/1, head_shoulders 0/1; AAPL 1.00"
+    )
     assert (
         ctx.data["candidates"]["rule_hash"].iloc[0] == cfg_tmp.rules["oversold_uptrend"].source_hash
     )

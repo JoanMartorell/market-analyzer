@@ -38,6 +38,9 @@ SIGNAL_COLUMNS = (
     "score",
     "conditions_met",
     "close",
+    "pattern",
+    "stop_price",
+    "target_price",
     "currency",
     "execute_on",
     "verdict",
@@ -82,6 +85,9 @@ class SignalStore(Table):
     """
     COLUMNS_ADDED: ClassVar[dict[str, str]] = {
         "headline": "VARCHAR",  # el motivo del modelo en una línea, para el aviso
+        "pattern": "VARCHAR",  # patrón chartista que rompió ese día; NULL en reglas sin patrón
+        "stop_price": "DOUBLE",  # niveles del patrón, en el precio real del día de la señal
+        "target_price": "DOUBLE",
         "execution_open": "DOUBLE",  # apertura real de la sesión execute_on
         "open_gap": "DOUBLE",  # execution_open / close - 1
         "reconcile_status": "VARCHAR",  # conciliada | desviada | sin_precio

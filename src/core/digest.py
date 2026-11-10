@@ -10,6 +10,10 @@ va un pie con lo que cuesta y lo que dio de sí la conciliación de ayer.
 Sin veredicto del modelo (``llm.enabled: false`` o paso saltado) se listan
 los candidatos por puntuación de la regla con las condiciones cumplidas
 como motivo, y el mensaje lo dice.
+
+Una señal de patrón chartista lleva además el nombre de la figura y sus
+niveles de stop y objetivo. El gráfico de cada operación va aparte, en un
+mensaje por operación (``core.operations``).
 """
 
 from __future__ import annotations
@@ -21,11 +25,12 @@ from typing import Any
 import pandas as pd
 
 from analyzer.engine import PipelineResult
+from analyzer.patterns import PATTERNS_BY_NAME
 from analyzer.steps.llm.schema import CONFIRM, DISCARD, WATCH
 from delivery import Message
 
-HEADINGS = {"long": "COMPRAR", "short": "VENDER"}
-TAGS = {"long": "compra", "short": "venta"}
+HEADINGS = {"long": "COMPRAR", "short": "VENDER EN CORTO"}
+TAGS = {"long": "compra", "short": "corto"}
 WHY_LIMIT = 160  # caracteres del motivo por valor; más no cabe en una línea del móvil
 BULLET = "•"
 
@@ -109,9 +114,32 @@ def _bullet(row: pd.Series, analysed: bool, *, tag: bool = False) -> str:
     else:
         parts.append(f"score {float(row['score']):.2f}")
         why = _brief(str(row.get("conditions_met") or ""))
+    figure = pattern_levels(row)
+    if figure:
+        parts.append(figure)
     if why:
         parts.append(why)
     return f"{BULLET} {' · '.join(parts)}"
+
+
+def pattern_label(row: pd.Series) -> str | None:
+    """Nombre de la figura de una señal de patrón; ``None`` si la regla no es de patrones."""
+    name = row.get("pattern")
+    spec = PATTERNS_BY_NAME.get(name) if isinstance(name, str) else None
+    return None if spec is None else spec.label
+
+
+def pattern_levels(row: pd.Series) -> str:
+    """``doble suelo, stop 95.10, objetivo 108.40``; vacío si la señal no es de patrón."""
+    label = pattern_label(row)
+    if label is None:
+        return ""
+    parts = [label]
+    for name, column in (("stop", "stop_price"), ("objetivo", "target_price")):
+        level = row.get(column)
+        if level is not None and pd.notna(level):
+            parts.append(f"{name} {float(level):.2f}")
+    return ", ".join(parts)
 
 
 def _brief(text: str, limit: int = WHY_LIMIT) -> str:

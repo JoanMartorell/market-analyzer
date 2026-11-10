@@ -22,6 +22,8 @@ from typing import Any
 
 import pandas as pd
 
+from analyzer.patterns import PATTERNS_BY_NAME
+
 Row = dict[Hashable, Any]  # una fila tal como la devuelve ``DataFrame.to_dict("records")``
 
 MAX_TOPICS = 5  # temas por valor: los más recientes; el resto es ruido repetido
@@ -74,7 +76,7 @@ def _candidate(
 ) -> dict[str, Any]:
     ticker = str(row["ticker"])
     attributes = names.get((ticker, str(row["mic"])), {})
-    return {
+    candidate = {
         "ticker": ticker,
         "nombre": attributes.get("name") or ticker,
         "sector": _text(row.get("sector")),
@@ -86,6 +88,14 @@ def _candidate(
         "condiciones": _conditions(row.get("conditions_met")),
         "temas": topics.get(ticker, []),
     }
+    # Solo si la regla es de patrones: un candidato sin patrón da el mismo JSON
+    # (y el mismo hash) que antes de que existieran.
+    pattern = PATTERNS_BY_NAME.get(_text(row.get("pattern")))
+    if pattern is not None:
+        candidate["patron"] = pattern.label
+        candidate["stop"] = _number(row.get("stop_price"), PRICE_DECIMALS)
+        candidate["objetivo"] = _number(row.get("target_price"), PRICE_DECIMALS)
+    return candidate
 
 
 def _conditions(raw: object) -> list[str]:

@@ -21,6 +21,7 @@ from core.app import (
     bootstrap,
     default_session,
     delivery_env_requirements,
+    pattern_stats,
     prices_status,
     reconcile_region,
     run_region,
@@ -41,6 +42,10 @@ ingest_app = typer.Typer(
 app.add_typer(ingest_app, name="ingest")
 telegram_app = typer.Typer(no_args_is_help=True, help="Entrega por Telegram: descubrir el chat.")
 app.add_typer(telegram_app, name="telegram")
+patterns_app = typer.Typer(
+    no_args_is_help=True, help="Patrones chartistas: qué encuentra el detector y cómo acabó."
+)
+app.add_typer(patterns_app, name="patterns")
 
 ConfigDirOption = Annotated[
     Path | None,
@@ -277,6 +282,50 @@ def ingest_status(
     typer.echo(f"rango:       {status['first_date']} -> {status['last_date']}")
     _echo_list("sin ninguna vela", status["absent"])
     _echo_list(f"sin llegar a {day}", status["stale"])
+
+
+@patterns_app.command("stats")
+def patterns_stats(
+    region: RegionOption,
+    as_of: DateOption = None,
+    horizon: Annotated[
+        int,
+        typer.Option("--horizon", "-n", help="Sesiones que se sigue cada operación.", min=1),
+    ] = 40,
+    config_dir: ConfigDirOption = None,
+) -> None:
+    """Pasa el detector por el histórico de prod: cuántos patrones y cuántos al objetivo.
+
+    No descarga precios ni llama al modelo. Entra en la apertura siguiente a
+    la ruptura y sale en el primer nivel que toque el precio.
+    """
+    try:
+        cfg = bootstrap(config_dir)
+        day = as_of.date() if as_of else default_session(cfg, region)
+        stats = pattern_stats(cfg, region, day, horizon)
+    except (ConfigError, FileNotFoundError, ValueError) as exc:
+        raise _fail(str(exc), 1) from None
+
+    typer.echo(f"universo:  {region} a {day}, {stats.keys} valores con velas en prod")
+    typer.echo(f"horizonte: {stats.horizon} sesiones desde la apertura siguiente a la ruptura")
+    typer.echo("")
+    header = (
+        f"{'patrón':32} {'dir':5} {'n':>5} {'objetivo':>8} {'stop':>5} "
+        f"{'abiertas':>8} {'anuladas':>8} {'acierto':>8} {'retorno':>8}"
+    )
+    typer.echo(header)
+    for row in stats.table().to_dict("records"):
+        hit = "-" if row["acierto"] != row["acierto"] else f"{row['acierto']:.0%}"
+        mean = (
+            "-" if row["retorno_medio"] != row["retorno_medio"] else f"{row['retorno_medio']:+.1%}"
+        )
+        side = "largo" if row["direccion"] == "long" else "corto"
+        typer.echo(
+            f"{row['patron']:32} {side:5} {row['hallazgos']:>5} {row['objetivo']:>8} "
+            f"{row['stop']:>5} {row['abiertas']:>8} {row['anuladas']:>8} {hit:>8} {mean:>8}"
+        )
+    typer.echo("")
+    typer.echo("acierto = objetivo / (objetivo + stop); retorno medio bruto, sin costes.")
 
 
 @telegram_app.command("chats")
