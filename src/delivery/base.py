@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import ClassVar, Literal, Protocol
 
 Severity = Literal["info", "warning", "error"]
@@ -19,6 +19,8 @@ class Message:
     subject: str
     body: str
     severity: Severity = "info"
+    # PNG adjunto; cada canal lo lleva como pueda (Telegram como foto, la consola lo anota).
+    image: bytes | None = field(default=None, repr=False)
 
 
 class DeliveryProvider(Protocol):

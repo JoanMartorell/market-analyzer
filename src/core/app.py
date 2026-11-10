@@ -13,18 +13,22 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
+import duckdb
+import pandas as pd
 import structlog
 
 from analyzer.engine import Pipeline, PipelineResult, StepContext
+from analyzer.patterns.evaluate import DEFAULT_HORIZON, PatternStats, evaluate_prices
 from analyzer.sessions import last_closed_session
 from analyzer.steps import build_daily_steps, build_reconcile_steps
 from analyzer.steps.ingest import IngestReport, get_price_provider, ingest_prices
-from analyzer.steps.ingest.service import universe_keys
+from analyzer.steps.ingest.service import lookback_start, universe_keys
 from analyzer.storage import PriceStore, connect
 from analyzer.universe import load_constituents, members_as_of, members_between
 from core.config import AppConfig, ConfigError, Region, load_config
 from core.digest import build_digest
 from core.logs import configure_logging
+from core.operations import build_operation_messages, recommended_operations
 from delivery import Dispatcher, Message, TelegramChat, build_dispatcher, required_env
 from delivery import telegram_chats as discover_telegram_chats
 
@@ -129,7 +133,9 @@ def notify(
     """Entrega el ciclo: el resumen de señales si fue bien, la tabla de pasos si no.
 
     ``data`` es el contexto que dejaron los pasos (señales, análisis, coste);
-    sin él solo se puede enviar la tabla de pasos.
+    sin él solo se puede enviar la tabla de pasos. Tras el resumen va un
+    mensaje por operación recomendada, con su gráfico
+    (``delivery.notify_operations``).
     """
     delivery = cfg.settings.delivery
     if not result.ok:
@@ -148,7 +154,61 @@ def notify(
                 Message(subject=f"[{result.region_id}] ciclo {result.as_of}", body=result.summary())
             )
         return
-    dispatcher.send(build_digest(result, data if data is not None else {}))
+    context = data if data is not None else {}
+    dispatcher.send(build_digest(result, context))
+    if delivery.notify_operations:
+        for message in operation_messages(cfg, result, context):
+            dispatcher.send(message)
+
+
+def operation_messages(
+    cfg: AppConfig, result: PipelineResult, data: Mapping[str, Any]
+) -> list[Message]:
+    """Los mensajes de las operaciones del ciclo, cada uno con el gráfico de su valor.
+
+    Las velas salen de prod con la misma ventana que usó el paso de
+    indicadores, para que la figura dibujada sea la que generó la señal. Si
+    la base no se puede leer, los mensajes salen sin gráfico y lo dicen.
+    """
+    signals = data.get("signals")
+    if not isinstance(signals, pd.DataFrame) or signals.empty:
+        return []
+    analysed = data.get("analysis") is not None
+    operations = recommended_operations(signals, analysed)
+    if operations.empty:
+        return []
+    return build_operation_messages(
+        signals,
+        region_id=result.region_id,
+        analysed=analysed,
+        bars=_operation_bars(cfg, operations, result.as_of),
+        names=_names(data.get("panel")),
+    )
+
+
+def _operation_bars(
+    cfg: AppConfig, operations: pd.DataFrame, as_of: date
+) -> dict[tuple[str, str], pd.DataFrame]:
+    start = lookback_start(as_of, cfg.settings.indicators.lookback_days)
+    try:
+        with connect(cfg) as con:
+            store = PriceStore(con, cfg.settings.data.prod_schema)
+            prices = store.load(start=start, end=as_of, keys=operations.loc[:, ["ticker", "mic"]])
+    except (OSError, duckdb.Error) as exc:
+        log.error("operations.prices_failed", error=str(exc))
+        return {}
+    return {
+        (str(ticker), str(mic)): bars.sort_values("date").reset_index(drop=True)
+        for (ticker, mic), bars in prices.groupby(["ticker", "mic"], sort=False)
+    }
+
+
+def _names(panel: object) -> dict[tuple[str, str], str]:
+    """Nombre de cada valor según el panel del ciclo; sin panel, ninguno."""
+    if not isinstance(panel, pd.DataFrame) or "name" not in panel.columns:
+        return {}
+    named = panel.loc[panel["name"].notna(), ["ticker", "mic", "name"]]
+    return {(str(t), str(m)): str(n) for t, m, n in named.itertuples(index=False) if str(n).strip()}
 
 
 def telegram_chats(cfg: AppConfig) -> list[TelegramChat]:
@@ -196,6 +256,41 @@ def backfill_prices(cfg: AppConfig, region_id: str, as_of: date, years: int) -> 
             start=start,
             fallback=fallback,
         )
+
+
+def pattern_stats(
+    cfg: AppConfig,
+    region_id: str,
+    as_of: date,
+    horizon: int = DEFAULT_HORIZON,
+    years: int | None = None,
+) -> PatternStats:
+    """Patrones que el detector encuentra en el histórico guardado y cómo acabó cada uno.
+
+    No descarga nada ni llama al modelo. Mide frecuencia y desenlace, no es
+    un backtest: no descuenta costes.
+
+    Sin ``years`` recorre prod (lo que pasó ``quality``, unas 250 sesiones)
+    para los valores vigentes a ``as_of``. Con ``years`` recorre ese tramo
+    de staging, que es donde deja las velas ``ingest backfill``, para todo
+    valor que estuvo en el índice en el rango. Staging no ha pasado ningún
+    control: sirve para comparar patrones entre años, no para fiarse de un
+    hallazgo suelto.
+    """
+    region = _region(cfg, region_id)
+    table = load_constituents(cfg.constituents_path(region))
+    data = cfg.settings.data
+    if years is None:
+        schema, start = data.prod_schema, None
+        members = members_as_of(table, as_of)
+    else:
+        schema, start = data.staging_schema, as_of - timedelta(days=365 * years)
+        members = members_between(table, start, as_of)
+    with connect(cfg) as con:
+        prices = PriceStore(con, schema).load(start=start, end=as_of, keys=universe_keys(members))
+    if prices.empty:
+        raise ValueError(f"no hay velas en {schema} para {region_id!r} hasta {as_of}")
+    return evaluate_prices(prices, horizon=horizon)
 
 
 def prices_status(cfg: AppConfig, region_id: str, as_of: date) -> dict[str, Any]:

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
 
@@ -21,6 +21,7 @@ from core.app import (
     bootstrap,
     default_session,
     delivery_env_requirements,
+    pattern_stats,
     prices_status,
     reconcile_region,
     run_region,
@@ -41,6 +42,10 @@ ingest_app = typer.Typer(
 app.add_typer(ingest_app, name="ingest")
 telegram_app = typer.Typer(no_args_is_help=True, help="Entrega por Telegram: descubrir el chat.")
 app.add_typer(telegram_app, name="telegram")
+patterns_app = typer.Typer(
+    no_args_is_help=True, help="Patrones chartistas: qué encuentra el detector y cómo acabó."
+)
+app.add_typer(patterns_app, name="patterns")
 
 ConfigDirOption = Annotated[
     Path | None,
@@ -277,6 +282,72 @@ def ingest_status(
     typer.echo(f"rango:       {status['first_date']} -> {status['last_date']}")
     _echo_list("sin ninguna vela", status["absent"])
     _echo_list(f"sin llegar a {day}", status["stale"])
+
+
+@patterns_app.command("stats")
+def patterns_stats(
+    region: RegionOption,
+    as_of: DateOption = None,
+    horizon: Annotated[
+        int,
+        typer.Option("--horizon", "-n", help="Sesiones que se sigue cada operación.", min=1),
+    ] = 40,
+    years: Annotated[
+        int | None,
+        typer.Option(
+            "--years",
+            "-y",
+            help="Años de histórico de staging (tras `ingest backfill`), desglosados por año.",
+            min=1,
+        ),
+    ] = None,
+    config_dir: ConfigDirOption = None,
+) -> None:
+    """Pasa el detector por el histórico guardado: cuántos patrones y cuántos al objetivo.
+
+    No descarga precios ni llama al modelo. Entra en la apertura siguiente a
+    la ruptura y sale en el primer nivel que toque el precio. Sin --years lee
+    prod (unas 250 sesiones); con --years, ese tramo de staging, sin control
+    de calidad, y añade el desglose por año.
+    """
+    try:
+        cfg = bootstrap(config_dir)
+        day = as_of.date() if as_of else default_session(cfg, region)
+        stats = pattern_stats(cfg, region, day, horizon, years)
+    except (ConfigError, FileNotFoundError, ValueError) as exc:
+        raise _fail(str(exc), 1) from None
+
+    source = "prod" if years is None else f"staging, {years} años"
+    typer.echo(f"universo:  {region} a {day}, {stats.keys} valores con velas ({source})")
+    typer.echo(f"horizonte: {stats.horizon} sesiones desde la apertura siguiente a la ruptura")
+    typer.echo("")
+    _echo_pattern_rows(stats.table().to_dict("records"))
+    if years is not None:
+        yearly = stats.yearly()
+        for year in sorted(yearly["año"].unique()):
+            typer.echo("")
+            typer.echo(f"--- {year} ---")
+            _echo_pattern_rows(yearly.loc[yearly["año"] == year].to_dict("records"))
+    typer.echo("")
+    typer.echo("acierto = objetivo / (objetivo + stop); retorno medio bruto, sin costes.")
+
+
+def _echo_pattern_rows(rows: list[dict[Any, Any]]) -> None:
+    header = (
+        f"{'patrón':32} {'dir':5} {'n':>5} {'objetivo':>8} {'stop':>5} "
+        f"{'abiertas':>8} {'anuladas':>8} {'acierto':>8} {'retorno':>8}"
+    )
+    typer.echo(header)
+    for row in rows:
+        hit = "-" if row["acierto"] != row["acierto"] else f"{row['acierto']:.0%}"
+        mean = (
+            "-" if row["retorno_medio"] != row["retorno_medio"] else f"{row['retorno_medio']:+.1%}"
+        )
+        side = "largo" if row["direccion"] == "long" else "corto"
+        typer.echo(
+            f"{row['patron']:32} {side:5} {row['hallazgos']:>5} {row['objetivo']:>8} "
+            f"{row['stop']:>5} {row['abiertas']:>8} {row['anuladas']:>8} {hit:>8} {mean:>8}"
+        )
 
 
 @telegram_app.command("chats")

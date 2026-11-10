@@ -34,4 +34,14 @@ news:
   strategy: native                 # native | translate | technical_only
 
 rules:
-  - oversold_uptrend
+  - oversold_uptrend               # convive con los patrones para poder compararlos
+  - double_bottom                  # patrones chartistas: largo
+  - inv_head_shoulders
+  - ascending_triangle
+  - bull_flag
+  # Patrones de corto: sin activar (desde el 2026-11-10). En cinco años de Américas las
+  # cuatro figuras perdieron de media, también en 2022: doble techo -2,0 % (917 casos),
+  # hombro-cabeza-hombro -0,7 % (83), triángulo descendente -1,7 % (158) y bandera
+  # bajista -2,9 % (909). Las reglas y el detector siguen y `analyzer patterns stats
+  # --years 5` las mide; para reactivar una, añadirla aquí:
+  #   double_top, head_shoulders, descending_triangle, bear_flag

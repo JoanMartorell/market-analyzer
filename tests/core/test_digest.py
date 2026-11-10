@@ -111,7 +111,10 @@ def test_the_digest_lists_buy_sell_watch_and_discarded() -> None:
         result, {"signals": signals, "analysis": analysis, "llm": _llm(analysis)}
     )
 
-    assert message.subject == "[americas] 2026-09-17: 2 comprar, 1 vender, 1 vigilar, 1 descartar"
+    assert (
+        message.subject
+        == "[americas] 2026-09-17: 2 comprar, 1 vender en corto, 1 vigilar, 1 descartar"
+    )
     assert message.body.splitlines() == [
         "5 señales del 2026-09-17, a ejecutar el 2026-09-18",
         "",
@@ -119,7 +122,7 @@ def test_the_digest_lists_buy_sell_watch_and_discarded() -> None:
         "• PCAR · 101.25 USD · 80% · Backlog récord sostiene la tendencia",
         "• RTX · 101.25 USD · 75% · Nada en contra.",  # sin headline, la primera frase del motivo
         "",
-        "VENDER",
+        "VENDER EN CORTO",
         "• SHRT · 101.25 USD · 60% · Rompe soporte.",
         "",
         "VIGILAR",
@@ -191,3 +194,23 @@ def test_brief_keeps_the_first_sentence_within_the_limit() -> None:
     long = "palabra " * 40
     cut = _brief(long)
     assert len(cut) <= WHY_LIMIT + 1 and cut.endswith("…")
+
+
+def test_a_pattern_signal_shows_the_figure_and_its_levels() -> None:
+    figure = _candidate("DBL") | {
+        "rule_id": "double_top",
+        "direction": "short",
+        "pattern": "double_top",
+        "stop_price": 108.4,
+        "target_price": 95.1,
+    }
+    analysis = Analysis(summary="", verdicts=[_verdict("DBL", "confirmar", 0.7, "Sin noticias.")])
+    signals = _signals([figure], analysis)
+
+    message = build_digest(_result(), {"signals": signals, "analysis": analysis})
+
+    assert message.subject == "[americas] 2026-09-17: 1 vender en corto"
+    assert message.body.splitlines()[2:4] == [
+        "VENDER EN CORTO",
+        "• DBL · 101.25 USD · 70% · doble techo, stop 108.40, objetivo 95.10 · Sin noticias.",
+    ]

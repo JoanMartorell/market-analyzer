@@ -23,5 +23,9 @@ class ConsoleProvider:
 
     def send(self, message: Message) -> None:
         icon = _ICONS[message.severity]
-        self._stream.write(f"[{icon}] {message.subject}\n{message.body}\n")
+        text = f"[{icon}] {message.subject}\n{message.body}\n"
+        if message.image is not None:
+            # La consola no pinta imágenes: deja constancia de que el mensaje la lleva.
+            text += f"(imagen adjunta, {len(message.image) / 1024:.0f} kB)\n"
+        self._stream.write(text)
         self._stream.flush()

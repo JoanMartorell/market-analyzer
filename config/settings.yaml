@@ -73,6 +73,7 @@ delivery:
   channels: [console, telegram]              # PROVISIONAL para pruebas; producción: [telegram]
   notify_on_failure: true          # el silencio no es éxito
   notify_on_no_signals: true
+  notify_operations: true          # tras el resumen, un mensaje con gráfico por cada operación recomendada
 
 pipeline:
   lock_dir: ./data/locks

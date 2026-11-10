@@ -2,6 +2,10 @@
 
 Sin librería intermedia: una llamada HTTP con httpx es todo lo que hace falta.
 El cliente es inyectable para poder probar sin red.
+
+Un mensaje con imagen va por ``sendPhoto`` con el texto como pie. El pie
+tiene un límite más corto que un mensaje: si el texto no cabe, la foto sale
+con el asunto y el texto completo va detrás como mensaje normal.
 """
 
 from __future__ import annotations
@@ -13,6 +17,7 @@ import httpx
 from delivery.base import Credentials, DeliveryError, Message
 
 TELEGRAM_MAX_LEN = 4096  # límite de la API por mensaje
+TELEGRAM_CAPTION_MAX_LEN = 1024  # límite del pie de una foto
 _ICONS = {"info": "📊", "warning": "⚠️", "error": "❌"}
 
 
@@ -28,7 +33,7 @@ class TelegramProvider:
         client: httpx.Client | None = None,
         timeout: float = 10.0,
     ) -> None:
-        self._url = f"https://api.telegram.org/bot{token}/sendMessage"
+        self._base = f"https://api.telegram.org/bot{token}"
         self._chat_id = chat_id
         self._client = client if client is not None else httpx.Client(timeout=timeout)
 
@@ -41,19 +46,48 @@ class TelegramProvider:
         return cls(token=token, chat_id=chat_id)
 
     def send(self, message: Message) -> None:
-        text = f"{_ICONS[message.severity]} {message.subject}\n\n{message.body}"
+        heading = f"{_ICONS[message.severity]} {message.subject}"
+        text = f"{heading}\n\n{message.body}"
+        if message.image is not None:
+            if len(text) <= TELEGRAM_CAPTION_MAX_LEN:
+                self._post_photo(message.image, text)
+                return
+            self._post_photo(message.image, heading[:TELEGRAM_CAPTION_MAX_LEN])
         for chunk in split_text(text, TELEGRAM_MAX_LEN):
-            self._post(chunk)
+            self._post_text(chunk)
 
-    def _post(self, text: str) -> None:
+    def _post_text(self, text: str) -> None:
+        self._call(
+            "sendMessage",
+            json={"chat_id": self._chat_id, "text": text, "disable_web_page_preview": True},
+        )
+
+    def _post_photo(self, image: bytes, caption: str) -> None:
+        self._call(
+            "sendPhoto",
+            data={"chat_id": self._chat_id, "caption": caption},
+            files={"photo": ("grafico.png", image, "image/png")},
+        )
+
+    def _call(
+        self,
+        method: str,
+        *,
+        json: dict[str, object] | None = None,
+        data: dict[str, str] | None = None,
+        files: dict[str, tuple[str, bytes, str]] | None = None,
+    ) -> None:
         try:
+            # El error de httpx lleva la URL, y la URL lleva el token: se informa
+            # del método y del estado, nunca del texto de la excepción.
             response = self._client.post(
-                self._url,
-                json={"chat_id": self._chat_id, "text": text, "disable_web_page_preview": True},
+                f"{self._base}/{method}", json=json, data=data, files=files
             )
             response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            raise DeliveryError(f"telegram: {method} devolvió {exc.response.status_code}") from None
         except httpx.HTTPError as exc:
-            raise DeliveryError(f"telegram: {exc}") from exc
+            raise DeliveryError(f"telegram: {method} falló ({type(exc).__name__})") from None
         payload = response.json()
         if not payload.get("ok", False):
             raise DeliveryError(f"telegram: {payload.get('description', 'respuesta no ok')}")

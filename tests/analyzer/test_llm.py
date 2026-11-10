@@ -699,3 +699,20 @@ def test_the_step_analyses_and_leaves_the_answer_in_the_context(
 def _with_llm(cfg: AppConfig, **overrides: Any) -> Any:
     llm = cfg.settings.llm.model_copy(update=overrides)
     return cfg.settings.model_copy(update={"llm": llm})
+
+
+def test_payload_adds_pattern_and_levels_only_to_pattern_candidates() -> None:
+    figure = _candidate("BBB", pattern="double_bottom", stop_price=95.123456, target_price=108.0)
+    payload = build_payload(
+        _candidates(_candidate(), figure),
+        _clusters(),
+        region_id="americas",
+        as_of=AS_OF,
+        currency="EUR",
+    )
+
+    plain, with_pattern = payload["candidatos"]
+    assert "patron" not in plain  # sin patrón, el mismo JSON (y el mismo hash) de siempre
+    assert "stop" not in plain
+    assert with_pattern["patron"] == "doble suelo"
+    assert (with_pattern["stop"], with_pattern["objetivo"]) == (95.1235, 108.0)

@@ -129,6 +129,8 @@ class DeliverySettings(StrictModel):
     channels: list[str] = Field(default_factory=lambda: ["console"], min_length=1)
     notify_on_failure: bool = True
     notify_on_no_signals: bool = True
+    # Tras el resumen del día, un mensaje por operación recomendada con su gráfico.
+    notify_operations: bool = True
 
 
 class PipelineSettings(StrictModel):

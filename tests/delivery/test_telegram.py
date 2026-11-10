@@ -123,3 +123,60 @@ def test_chats_with_a_bad_token_is_a_delivery_error() -> None:
     )
     with pytest.raises(DeliveryError, match="401"):
         telegram_chats("TOKEN", client=client)
+
+
+# --- mensajes con imagen ------------------------------------------------------------
+
+PNG = b"\x89PNG\r\n\x1a\n" + b"datos-de-la-imagen"
+
+
+def _photo_provider() -> tuple[TelegramProvider, list[httpx.Request]]:
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        request.read()
+        requests.append(request)
+        return httpx.Response(200, json={"ok": True, "result": {}})
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    return TelegramProvider("TOKEN", "12345", client=client), requests
+
+
+def test_a_message_with_image_goes_as_a_photo_with_the_text_as_caption() -> None:
+    provider, requests = _photo_provider()
+    provider.send(Message("COMPRAR AAA", "Cierre 101.25 USD", image=PNG))
+
+    assert [r.url.path for r in requests] == ["/botTOKEN/sendPhoto"]
+    body = requests[0].content
+    assert requests[0].headers["content-type"].startswith("multipart/form-data")
+    assert PNG in body
+    assert b'name="caption"' in body
+    assert b"COMPRAR AAA" in body
+    assert b"Cierre 101.25 USD" in body
+    assert b'name="chat_id"' in body
+    assert b"12345" in body
+
+
+def test_a_text_too_long_for_a_caption_follows_the_photo_as_a_message() -> None:
+    provider, requests = _photo_provider()
+    body = "\n".join(f"línea {i}" for i in range(300))  # más de 1024 caracteres
+    provider.send(Message("COMPRAR AAA", body, image=PNG))
+
+    assert [r.url.path for r in requests] == ["/botTOKEN/sendPhoto", "/botTOKEN/sendMessage"]
+    assert "línea 299" not in requests[0].content.decode("utf-8", errors="ignore")
+    assert str(json.loads(requests[1].content)["text"]).endswith("línea 299")
+
+
+def test_errors_never_carry_the_token() -> None:
+    def down(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(502)
+
+    def unreachable(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("sin red", request=request)
+
+    for handler in (down, unreachable):
+        provider, _ = _provider(handler)
+        with pytest.raises(DeliveryError) as raised:
+            provider.send(Message("a", "b"))
+        assert "TOKEN" not in str(raised.value)
+        assert "sendMessage" in str(raised.value)

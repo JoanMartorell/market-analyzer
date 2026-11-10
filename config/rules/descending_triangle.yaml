@@ -1,0 +1,29 @@
+# Patrón chartista: triángulo descendente.
+#
+# El detector (src/analyzer/patterns) deja en la tabla de indicadores una
+# columna por patrón que vale 1 el día de la ruptura, y los niveles de ese
+# día: pat_entry (línea rota), pat_stop y pat_target. Aquí solo se decide
+# cuándo esa ruptura es señal y cuánto puntúa.
+#
+# window: 1 -> la señal sale el día de la ruptura y se ejecuta en la apertura
+# siguiente. Con una ventana mayor el candidato de ayer saldría sin niveles.
+#
+# El hash sha256 de este fichero se guarda con cada señal que genere.
+version: 3
+
+id: descending_triangle
+description: Triángulo descendente con ruptura a la baja del soporte
+window: 1
+
+conditions:
+  - expr: "pat_descending_triangle == 1"
+    weight: 0.6
+    required: true                 # sin ruptura del patrón no hay señal
+  - expr: "volume > 1.2 * avg_volume_20"
+    weight: 0.2                    # ruptura con volumen por encima de lo normal
+  - expr: "(close - pat_target) >= (pat_stop - close)"
+    weight: 0.2                    # queda al menos tanto recorrido al objetivo como al stop
+
+output:
+  score_threshold: 0.6             # el patrón basta; volumen y recorrido ordenan los candidatos
+  direction: short

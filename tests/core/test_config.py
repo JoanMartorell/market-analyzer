@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from analyzer.patterns import PATTERNS
 from core.config import AppConfig, ConfigError, Env, Rule, load_config
 from core.config.schema import RegionProviders
 
@@ -21,7 +22,27 @@ def test_repo_config_loads(empty_env: Env) -> None:
     assert cfg.settings.base_currency == "EUR"
     assert set(cfg.regions) == {"americas", "europe", "apac", "latam"}
     assert "americas" in [r.id for r in cfg.enabled_regions()]
-    assert set(cfg.rules) == {"oversold_uptrend"}
+    assert set(cfg.rules) == {
+        "oversold_uptrend",
+        "double_bottom",
+        "double_top",
+        "inv_head_shoulders",
+        "head_shoulders",
+        "ascending_triangle",
+        "descending_triangle",
+        "bull_flag",
+        "bear_flag",
+    }
+    # La regla de indicadores convive en todas las regiones con los patrones de compra.
+    # Los de corto tienen regla pero ninguna región los usa: su histórico no los respalda.
+    for region in cfg.regions.values():
+        assert region.rules[0] == "oversold_uptrend"
+        directions = {cfg.rules[rule_id].output.direction for rule_id in region.rules}
+        assert directions == {"long"}
+        assert len(region.rules) == 5
+    # Cada patrón del catálogo tiene su regla, con la dirección que le corresponde.
+    for spec in PATTERNS:
+        assert cfg.rules[spec.name].output.direction == spec.direction
     assert cfg.data_dir == (ROOT / "data").resolve()
 
 
